@@ -21,7 +21,7 @@ userlist = {}
 #each item is a tuple of 4 values, 0 == frequency in seconds, 1 == offset from 0, 2 == function, 3 == arguments
 timerlist = []
 
-
+# colour parsing re: re.sub('\x1b\[([0-9]+)])m','<asci colour=\\1>',string)
 
 def connectxmpp():
     global connection
@@ -56,12 +56,24 @@ class Transport:
             wrsocketlist[s].append(packet)
 
     def findbadconn(self):
-        print rdsocketlist
+        #print rdsocketlist
         for each in userlist:
             print each, userlist[each].sock.fileno()
             if userlist[each].sock.fileno() == -1:
-                print each, userlist[each].sock.fileno()
+                #print each, userlist[each].sock.fileno()
                 self.y_closed(userlist[each])
+            else:
+                try:
+                    a,b,c = select.select([userlist[each].sock],[userlist[each].sock],[userlist[each].sock],0)
+                except:
+                    self.y_closed(userlist[each])
+        badlist = []
+        for each in wrsocketlist.keys():
+            if each.fileno() == -1:
+                badlist.append(each)
+        for each in badlist:
+            del wrsocketlist[each]
+        return
     
     def register_handlers(self):
         self.jabber.RegisterHandler('message',self.xmpp_message)
@@ -276,14 +288,15 @@ class Transport:
                     else:
                         # open connection case
                         conf = userfile[fromstripped]
-                        yobj = ylib.YahooCon(conf['username'].encode('utf-8'),conf['password'].encode('utf-8'), fromstripped)
+                        yobj = ylib.YahooCon(conf['username'].encode('utf-8'),conf['password'].encode('utf-8'), fromstripped,localaddress)
                         #userlist[fromstripped]=yobj
                         s = yobj.connect()
                         if s != None:
                             rdsocketlist[s]=yobj
                             userlist[yobj.fromjid]=yobj
                             self.register_ymsg_handlers(userlist[fromstripped])
-                            self.yahooqueue(fromstripped,yobj.ymsg_send_challenge())
+                            #self.yahooqueue(fromstripped,yobj.ymsg_send_challenge())
+                            self.yahooqueue(fromstripped,yobj.ymsg_send_init())
                             yobj.event = event
                             if event.getShow() == 'xa' or event.getShow() == 'away':
                                 yobj.away = 'away'
@@ -540,6 +553,8 @@ class Transport:
     def xmpp_iq_register_set(self, con, event):
         if event.getTo() == hostname:
             remove = False
+            username = False
+            password = False
             fromjid = event.getFrom().getStripped().encode('utf8')
             for each in event.getQueryPayload():
                 if each.getName() == 'username':
@@ -550,7 +565,7 @@ class Transport:
                     print "Have password ", password
                 elif each.getName() == 'remove':
                     remove = True
-            if not remove:
+            if not remove and username and password:
                 if userfile.has_key(fromjid):
                     conf = userfile[fromjid]
                 else:
@@ -561,7 +576,7 @@ class Transport:
                 if userlist.has_key(fromjid):
                     self.y_closed(userlist[fromjid])
                 if not userlist.has_key(fromjid):
-                    yobj = ylib.YahooCon(username.encode('utf-8'),password.encode('utf-8'), fromjid)
+                    yobj = ylib.YahooCon(username.encode('utf-8'),password.encode('utf-8'), fromjid,localaddress)
                     userlist[fromjid]=yobj
                     print "try connect"
                     s = yobj.connect()
@@ -576,7 +591,7 @@ class Transport:
                     yobj.event = event
                     yobj.showstatus = None
                     yobj.away = None
-            else:
+            elif remove and not username and not password:
                 if userlist.has_key(fromjid):
                     self.y_closed(userlist[fromjid])
                 if userfile.has_key(fromjid):
@@ -588,7 +603,9 @@ class Transport:
                     m = Presence(to = event.getFrom(), frm = hostname, typ = 'unsubscribed')
                     self.jabberqueue(m)
                 else:
-                    self.jaberqueue(Error(event,ERR_BAD_REQUEST))
+                    self.jabberqueue(Error(event,ERR_BAD_REQUEST))
+            else:
+                self.jabberqueue(Error(event,ERR_BAD_REQUEST))
         else:
             self.jabberqueue(Error(event,ERR_BAD_REQUEST))
     
@@ -623,6 +640,8 @@ class Transport:
             if not yobj.connok:
                 if yobj.moreservers():
                     del rdsocketlist[yobj.sock]
+                    if wrsocketlist.has_key(yobj.sock):
+                        del wrsocketlist[yobj.sock]
                     yobj.sock.close()
                     s= yobj.connect()
                     if s != None:
@@ -638,7 +657,9 @@ class Transport:
                 timerlist.remove(yobj.secpingobj)
             del userlist[yobj.fromjid]
             del rdsocketlist[yobj.sock]
-            yobj.sock.close()
+            if wrsocketlist.has_key(yobj.sock):
+                del wrsocketlist[yobj.sock]
+            #yobj.sock.close()
             del yobj
     
     def y_ping(self, yobj):
@@ -854,6 +875,8 @@ if __name__ == '__main__':
     secret = configfile.get('yahoo','Secret')
     if configfile.has_option('yahoo','LocalAddress'):
         localaddress = configfile.get('yahoo','LocalAddress')
+    else:
+        localaddress = '0.0.0.0'
     if configfile.has_option('yahoo','Charset'):
         charset = configfile.get('yahoo','Charset')
     
@@ -863,10 +886,11 @@ if __name__ == '__main__':
     trans = Transport(connection)
     rdsocketlist[connection.Connection._sock]='xmpp'
     while 1:
-        #print 'poll'
+        #print 'poll',rdsocketlist
         try:
-            (i , o, e) = select.select(rdsocketlist.keys(),wrsocketlist.keys(),rdsocketlist.keys(),1)
+            (i , o, e) = select.select(rdsocketlist.keys(),wrsocketlist.keys(),[],1)
         except ValueError:
+            print "Value Error", rdsocketlist, wrsocketlist
             trans.findbadconn()
 ##            for each in rdsocketlist.keys():
 ##                try:
