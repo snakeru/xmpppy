@@ -2,7 +2,7 @@
 # Copyright (C) Alexey Nezhdanov 2004
 # router, presence tracker and probes responder for xmppd.py
 
-# $Id: router.py,v 1.5 2004-10-24 04:36:28 snakeru Exp $
+# $Id: router.py,v 1.6 2004-10-27 18:45:59 snakeru Exp $
 
 from xmpp import *
 from xmppd import *
@@ -22,19 +22,26 @@ class Router(PlugIn):
 #        1) any other server
 #        2) any user
         to=stanza['to']
+        typ=stanza.getType()
         if  to and (
             to.getDomain() not in self._owner.servernames or
-            to.getNode() ):
+            to.getNode() and typ<>'probe'):
                 return
 
-        typ=stanza.getType()
         jid=session.peer
         try: barejid,resource=jid.split('/')
         except: raise NodeProcessed # Closure of not yet bound session
 
         if not typ or typ=='available':
+            # send presence to subscribed-to items
+            for to in self._owner.Roster.getSubTo(session):
+                session.dispatch(Presence(frm=session.peer,to=to,node=stanza),trusted=1)
+            # request presence from subscribed-from items
+            for frm in self._owner.Roster.getSubFrom(session):
+                session.dispatch(Presence(frm=session.peer,to=frm,typ='probe'),trusted=1)
+
             if not self._data.has_key(barejid): self._data[barejid]={}
-            if not self._data[barejid].has_key(resource): self._data[barejid][resource]=Presence(frm=jid,typ=typ)
+            if not self._data[barejid].has_key(resource): self._data[barejid][resource]=Presence(frm=jid)
             bp=self._data[barejid][resource]
 
             try: priority=int(stanza.getTagData('priority'))
@@ -54,13 +61,17 @@ class Router(PlugIn):
             self.update(barejid)
             if not self._data[barejid]: del self._data[barejid]
             self._owner.deactivatesession(session.peer)
-        elif typ=='probe':
+            # send presence to subscribed-to items
+            for to in self._owner.Roster.getSubTo(session):
+                session.dispatch(Presence(frm=session.peer,to=to,node=stanza),trusted=1)
+        elif typ=='probe' and to:
             try:
+                barejidto=stanza.getTo().getStripped()
                 resources=[stanza.getTo().getResource()]
-                if not resources[0]: resources=self._data[barejid].keys()
+                if not resources[0]: resources=self._data[barejidto].keys()
                 flag=1
                 for resource in resources:
-                    p=Presence(to=stanza.getFrom(),frm=session.peer,node=self._data[barejid][resource])
+                    p=Presence(to=stanza.getFrom(),frm=barejidto+'/'+resource,node=self._data[barejidto][resource])
                     if flag:
                         self._owner.Privacy(session.peer,p)
                         flag=None
@@ -100,11 +111,11 @@ class Router(PlugIn):
                     raise NodeProcessed
 
             if session._session_state<SESSION_BOUND: # NOT BOUND yet (bind stuff already done)
-                if stanza.getType()<>'error': session.send(Error(stanza,ERR_NOT_AUTHORIZED))
+                if stanza.getType()<>'error': session.enqueue(Error(stanza,ERR_NOT_AUTHORIZED))
                 raise NodeProcessed
 
             if name=='presence' and session._session_state<SESSION_OPENED:
-                if stanza.getType()<>'error': session.send(Error(stanza,ERR_NOT_ALLOWED))
+                if stanza.getType()<>'error': session.enqueue(Error(stanza,ERR_NOT_ALLOWED))
                 raise NodeProcessed
             stanza.setFrom(session.peer)
 
@@ -119,7 +130,8 @@ class Router(PlugIn):
             stanza.props in ( [NS_AUTH], [NS_REGISTER], [NS_BIND], [NS_SESSION] ):
               return
 
-        if not session.trusted: self.safeguard(session,stanza)
+        if not stanza.__dict__.has_key('trusted') or not stanza.trusted:
+            self.safeguard(session,stanza)
 
         if not to: return # stanza.setTo(session.ourname)
         domain=to.getDomain()
@@ -178,7 +190,7 @@ class Router(PlugIn):
 #          Presence Probes. In addition, the server MUST NOT rewrite the 'to' attribute (i.e., it MUST leave 
 #          it as <user@domain> rather than change it to <user@domain/resource>).
                 elif name=='presence':
-                    # all probes already processed so safely assuming "other" type
+                    if stanza.getType()=='probe': return
                     for resource in self._data[bareto].keys():
                         s=getsession(bareto+'/'+resource)
                         if s: s.enqueue(stanza)
