@@ -5,6 +5,7 @@
 # $Id$
 
 from xmpp import *
+from xmppd import *
 
 class Router(PlugIn):
     """ The first entity that gets access to arrived stanza. """
@@ -28,7 +29,8 @@ class Router(PlugIn):
 
         typ=stanza.getType()
         jid=session.peer
-        barejid,resource=jid.split('/')
+        try: barejid,resource=jid.split('/')
+        except: raise NodeProcessed # Closure of not yet bound session
 
         if not typ or typ=='available':
             if not self._data.has_key(barejid): self._data[barejid]={}
@@ -62,8 +64,8 @@ class Router(PlugIn):
                     if flag:
                         self._owner.Privacy(session.peer,bp)
                         flag=None
-                    session.send(bp)
-            except KeyError: session.send(Presence(to=stanza.getFrom(),frm=jid,typ='unavailable'))
+                    session.enqueue(bp)
+            except KeyError: session.enqueue(Presence(to=stanza.getFrom(),frm=jid,typ='unavailable'))
         else: return
         raise NodeProcessed
 
@@ -76,17 +78,8 @@ class Router(PlugIn):
         if s: self._owner.activatesession(s,barejid)
         else: self._owner.deactivatesession(barejid)
 
-    def routerHandler(self,session,stanza):
-        """ XMPP-Core 9.1.1 rules """
-        name=stanza.getName()
-        self.DEBUG('Router handler called','info')
-
-        to=stanza['to']
-        if (not to or to in self._owner.servernames) and \
-            (NS_AUTH in stanza.props or NS_REGISTER in stanza.props): return # Security hole to allow Non-SASL auth
-
-        ## safeguard start
-        if session._auth_state<3:       # NOT BOUND yet (stream's stuff already done)
+    def safeguard(self,session,stanza):
+        if session._session_state<SESSION_BOUND: # NOT BOUND yet (stream's stuff already done)
             session.terminate_stream(STREAM_NOT_AUTHORIZED)
             raise NodeProcessed
 
@@ -103,33 +96,47 @@ class Router(PlugIn):
                     session.terminate_stream(STREAM_INVALID_FROM)
                     raise NodeProcessed
 
-            if session._auth_state<3:   # NOT BOUND yet (bind stuff already done)
-                session.send(Error(stanza,ERR_NOT_AUTHORIZED))
+            if session._session_state<SESSION_BOUND: # NOT BOUND yet (bind stuff already done)
+                if stanza.getType()<>'error': session.send(Error(stanza,ERR_NOT_AUTHORIZED))
                 raise NodeProcessed
 
-            if name=='presence' and session._auth_state<4:
-                session.send(Error(stanza,ERR_NOT_ALLOWED))
+            if name=='presence' and session._session_state<SESSION_OPENED:
+                if stanza.getType()<>'error': session.send(Error(stanza,ERR_NOT_ALLOWED))
                 raise NodeProcessed
             stanza.setFrom(session.peer)
-        ## safeguard stop
+
+    def routerHandler(self,session,stanza):
+        """ XMPP-Core 9.1.1 rules """
+        name=stanza.getName()
+        self.DEBUG('Router handler called','info')
+
+        to=stanza['to']
+        if (not to or to==session.ourname) and \
+            (stanza.props==[NS_AUTH] \
+            or stanza.props==[NS_REGISTER] \
+            or stanza.props==[NS_BIND] \
+            or stanza.props==[NS_SESSION] \
+            ): return
+
+        if not session.trusted: self.safeguard(session,stanza)
 
         if not to: return # stanza.setTo(session.ourname)
         domain=to.getDomain().lower()
 
+        getsession=self._owner.getsession
         if domain in self._owner.servernames:
             node=to.getNode().lower()
             if not node: return
             self._owner.Privacy(session.peer,stanza) # it will raise NodeProcessed if needed
             bareto=node+'@'+domain
             resource=to.getResource()
-            gs=self._owner.getsession
 # 1. If the JID is of the form <user@domain/resource> and an available resource matches the full JID, 
 #    the recipient's server MUST deliver the stanza to that resource.
             if resource:
                 to=bareto+'/'+resource
-                s=gs(to)
+                s=getsession(to)
                 if s:
-                    s.send(stanza)
+                    s.enqueue(stanza)
                     raise NodeProcessed
 # 2. Else if the JID is of the form <user@domain> or <user@domain/resource> and the associated user account 
 #    does not exist, the recipient's server (a) SHOULD silently ignore the stanza (i.e., neither deliver it 
@@ -138,7 +145,7 @@ class Router(PlugIn):
 #    sender if it is a message stanza.
             if not self._owner.AUTH.isuser(node,domain):
                 if name in ['iq','message']:
-                    session.send(Error(stanza,ERR_SERVICE_UNAVAILABLE))
+                    if stanza.getType()<>'error': session.enqueue(Error(stanza,ERR_SERVICE_UNAVAILABLE))
                 raise NodeProcessed
 # 3. Else if the JID is of the form <user@domain/resource> and no available resource matches the full JID, 
 #    the recipient's server (a) SHOULD silently ignore the stanza (i.e., neither deliver it nor return an 
@@ -146,11 +153,11 @@ class Router(PlugIn):
 #    if it is an IQ stanza, and (c) SHOULD treat the stanza as if it were addressed to <user@domain> if it 
 #    is a message stanza.
             if resource and name<>'message':
-                if name=='iq': session.send(Error(stanza,ERR_SERVICE_UNAVAILABLE))
+                if name=='iq' and stanza.getType()<>'error': session.enqueue(Error(stanza,ERR_SERVICE_UNAVAILABLE))
                 raise NodeProcessed
 # 4. Else if the JID is of the form <user@domain> and there is at least one available resource available 
 #    for the user, the recipient's server MUST follow these rules:
-            s=gs(bareto)
+            s=getsession(bareto)
             if s:
 #       1. For message stanzas, the server SHOULD deliver the stanza to the highest-priority available 
 #          resource (if the resource did not provide a value for the <priority/> element, the server SHOULD 
@@ -163,7 +170,7 @@ class Router(PlugIn):
 #          were no available resources (defined below). In addition, the server MUST NOT rewrite the 'to' 
 #          attribute (i.e., it MUST leave it as <user@domain> rather than change it to <user@domain/resource>).
                 if name=='message':
-                    s.send(stanza)
+                    s.enqueue(stanza)
                     raise NodeProcessed
 #       2. For presence stanzas other than those of type "probe", the server MUST deliver the stanza to all 
 #          available resources; for presence probes, the server SHOULD reply based on the rules defined in 
@@ -172,8 +179,8 @@ class Router(PlugIn):
                 elif name=='presence':
                     # all probes already processed so safely assuming "other" type
                     for resource in self._data[bareto].keys():
-                        s=gs(bareto+'/'+resource)
-                        if s: s.send(stanza)
+                        s=getsession(bareto+'/'+resource)
+                        if s: s.enqueue(stanza)
                     raise NodeProcessed
 #       3. For IQ stanzas, the server itself MUST reply on behalf of the user with either an IQ result or an 
 #          IQ error, and MUST NOT deliver the IQ stanza to any of the available resources. Specifically, if 
@@ -203,7 +210,7 @@ class Router(PlugIn):
 #          matter of implementation and service provisioning.)
                 elif name=='message':
                     #self._owner.DB.store(domain,node,stanza)
-                    session.send(Error(stanza,ERR_SERVICE_UNAVAILABLE))
+                    if stanza.getType()<>'error': session.enqueue(Error(stanza,ERR_RECIPIENT_UNAVAILABLE))
                     raise NodeProcessed
 #       4. For IQ stanzas, the server itself MUST reply on behalf of the user with either an IQ result or 
 #          an IQ error. Specifically, if the semantics of the qualifying namespace define a reply that the 
@@ -211,6 +218,8 @@ class Router(PlugIn):
 #          MUST reply with a <service-unavailable/> stanza error.
                 return
         else:
-            # fireup s2s, checkit, send or return
-            session.send(Error(stanza,ERR_FEATURE_NOT_IMPLEMENTED))
+            s=getsession(to)
+            if not s:
+                s=self._owner.S2S(session.ourname,domain)
+            s.enqueue(stanza)
             raise NodeProcessed
