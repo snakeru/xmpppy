@@ -172,8 +172,8 @@ class Transport:
                         return
                     if event.getTo().getResource() == None or event.getTo().getResource() == '':
                         print userlist[fromstripped].roomlist, userlist[fromstripped].roomnames
-                        if userlist[fromstripped].roomlist.has_key(event.getTo().getNode().encode('utf-8').decode('base64')):
-                            room = event.getTo().getNode().encode('utf-8').decode('base64')
+                        if userlist[fromstripped].roomlist.has_key(event.getTo().getNode().encode('utf-8').decode('hex')):
+                            room = event.getTo().getNode().encode('utf-8').decode('hex')
                         elif userlist[fromstripped].roomnames.has_key(event.getTo().getNode()):
                             room = userlist[fromstripped].roomnames[event.getTo().getNode()].encode('utf-8')
                         else:
@@ -329,7 +329,7 @@ class Transport:
                     print "chat presence"
                     try:
                         #print event.getTo().getNode().encode('utf-8').decode('base64')
-                        room = unicode(event.getTo().getNode().encode('utf-8').decode('base64'),'utf-8','strict')
+                        room = unicode(event.getTo().getNode().encode('utf-8').decode('hex'),'utf-8','strict')
     
                     except:
                         if userlist[fromstripped].roomnames.has_key(event.getTo().getNode()):
@@ -377,7 +377,12 @@ class Transport:
                 #print userlist[fromjid.getStripped()].roster
                 if userlist[fromjid.getStripped()].roster.has_key(to.getNode()):
                     m = Iq(to=fromjid, frm=to,typ='result',queryNS=NS_DISCO_INFO)
-                    p = [Node('identity',attrs={'category':'client','type':'yahoo','name':'Yahoo! User'})]
+                    p = [Node('identity',attrs={'category':'client','type':'yahoo','name':to.getNode()})]
+                    #Individual feature code goes here
+                    #Avatar (old style)
+                    if userfile[fromjid.getStripped()]['avatar'].has_key(to.getNode()):
+                        p.append(Node('feature', attrs={'var':'jabber:iq:avatar'}))
+                    
                     m.setQueryPayload(p)
                     m.setID(id)
                     self.jabberqueue(m)
@@ -404,10 +409,12 @@ class Transport:
             else:
                 print 'item case', event.getQuerynode()
                 try:
-                    str = unicode(event.getTo().getNode().encode('utf-8').decode('base64'),'utf-8','strict')
+                    str = unicode(event.getTo().getNode().encode('utf-8').decode('hex'),'utf-8','strict')
+                    print str
                     info = None
                     if self.catlist.has_key(event.getQuerynode()):
                         lobby,room = str.split(':')
+                        print event.getQuerynode(), lobby, room
                         if self.catlist[event.getQuerynode()][1].has_key(lobby):
                             t = self.catlist[event.getQuerynode()][1][lobby]
                             print t
@@ -510,7 +517,7 @@ class Transport:
                             if each['type'] == 'yahoo':
                                 if each.has_key('rooms'):
                                     for c in each['rooms'].keys():
-                                        n = ('%s:%s' % (each['name'],c)).encode('base64').strip()
+                                        n = ('%s:%s' % (each['name'],c)).encode('hex')
                                         payload.append(Node('item',attrs={'jid':'%s@%s'%(n,chathostname),'node':event.getQuerynode(),'name':'%s:%s'%(each['name'],c)}))
                                         #print payload
                 m = event.buildReply('result')
@@ -655,6 +662,8 @@ class Transport:
                 timerlist.remove(yobj.pripingobj)
             if yobj.secpingobj in timerlist:
                 timerlist.remove(yobj.secpingobj)
+            if yobj.confpingobj in timerlist:
+                timerlist.remove(yobj.confpingobj)
             del userlist[yobj.fromjid]
             del rdsocketlist[yobj.sock]
             if wrsocketlist.has_key(yobj.sock):
@@ -664,7 +673,8 @@ class Transport:
     
     def y_ping(self, yobj):
         print "got ping!"
-        freq = yobj.pripingtime*60
+        #freq = yobj.pripingtime*60
+        freq = 5 * 60 #overide to ping time to try and reduce disconnects
         offset = int(time.time())%freq
         yobj.pripingtime = time.time()
         yobj.pripingobj=(freq,offset,self.yahooqueue,[yobj.fromjid, yobj.ymsg_send_priping()])
@@ -711,6 +721,11 @@ class Transport:
         self.jabberqueue(b)
     
     def y_chatonline(self,yobj, name):
+        freq = 5 * 60 #Secondary ping frequency from Zinc
+        offset = int(time.time())%freq
+        yobj.confpingtime = time.time()
+        yobj.confpingobj=(freq,offset,self.yahooqueue,[yobj.fromjid, yobj.ymsg_send_confping()])
+        timerlist.append(yobj.confpingobj)
         b = Presence(to = yobj.fromjid, frm = '%s@%s/chat' %(name,hostname), priority = 5)
         self.jabberqueue(b)
     
@@ -718,6 +733,8 @@ class Transport:
         self.jabberqueue(Presence(to = yobj.fromjid, frm = '%s@%s/messenger'%(name, hostname),typ='unavailable'))    
     
     def y_chatoffline(self,yobj,name):
+        if yobj.confpingobj in timerlist:
+            timerlist.remove(yojb.confpingobj)
         self.jabberqueue(Presence(to =yobj.fromjid, frm = '%s@%s/chat'%(name, hostname),typ='unavailable'))
     
     def y_subscribe(self,yobj,nick,msg):
@@ -738,7 +755,7 @@ class Transport:
             nick = yobj.roomlist[room]['byyid'][yid]['nick']
         else:
             nick = yid
-        self.jabberqueue(Message(typ = 'groupchat', frm = '%s@%s/%s' % (room.encode('base64').strip(),chathostname,nick),to=yobj.fromjid,body=txt))
+        self.jabberqueue(Message(typ = 'groupchat', frm = '%s@%s/%s' % (room.encode('hex'),chathostname,nick),to=yobj.fromjid,body=txt))
     
     def y_calendar(self,yobj,url,desc):
         m = Message(to=yobj.fromjid,typ='headline', subject = "Yahoo Calendar Event", body = desc)
@@ -802,8 +819,8 @@ class Transport:
     def y_chat_roominfo(self,fromjid,info):
         if not userlist[fromjid].roomlist.has_key(info['room']):
             userlist[fromjid].roomlist[info['room']]={'byyid':{},'bynick':{},'info':info}
-            self.jabberqueue(Presence(frm = '%s@%s' %(info['room'].encode('base64').strip(),chathostname),to=fromjid))
-            self.jabberqueue(Presence(frm = '%s@%s' %(info['room'].encode('base64').strip(),chathostname),to=fromjid, typ='groupchat', subject= info['topic']))
+            self.jabberqueue(Presence(frm = '%s@%s' %(info['room'].encode('hex'),chathostname),to=fromjid))
+            self.jabberqueue(Message(frm = '%s@%s' %(info['room'].encode('hex'),chathostname),to=fromjid, typ='groupchat', subject= info['topic']))
             
     def y_chat_join(self,fromjid,room,info):
         if userlist[fromjid].roomlist.has_key(room):
@@ -816,13 +833,13 @@ class Transport:
                     jid = fromjid
                     print info['nick'], userlist[fromjid].nick
                     if info['nick'] != userlist[fromjid].nick:
-                        p = Presence(frm = '%s@%s/%s' % (room.encode('base64').strip(),chathostname,userlist[fromjid].nick), typ='unavailable')
+                        p = Presence(frm = '%s@%s/%s' % (room.encode('hex'),chathostname,userlist[fromjid].nick), typ='unavailable')
                         p.addChild(node=MucUser(jid = jid, nick = info['nick'], role = 'participant', affiliation = 'none', status = 303))
                         self.jabberqueue(p)
                 else:
                     jid = '%s@%s' % (info['yip'],hostname)
                 userlist[fromjid].roomlist[room]['bynick'][info['nick']]= info['yip']
-                self.jabberqueue(Presence(frm = '%s@%s/%s' % (room.encode('base64').strip(),chathostname,info['nick']), to = fromjid, payload=[MucUser(role='participant',affiliation='none',jid = jid)]))
+                self.jabberqueue(Presence(frm = '%s@%s/%s' % (room.encode('hex'),chathostname,info['nick']), to = fromjid, payload=[MucUser(role='participant',affiliation='none',jid = jid)]))
     
     def y_chat_leave(self,fromjid,room,yid,nick):
         # Need to add some cleanup code
@@ -832,7 +849,7 @@ class Transport:
             if userlist[fromjid].roomlist[room]['byyid'].has_key(yid):
                 del userlist[fromjid].roomlist[room]['bynick'][userlist[fromjid].roomlist[room]['byyid'][yid]['nick']]
                 del userlist[fromjid].roomlist[room]['byyid'][yid]
-                self.jabberqueue(Presence(frm = '%s@%s/%s' % (room.encode('base64').strip(),chathostname,nick), to= fromjid, typ = 'unavailable'))
+                self.jabberqueue(Presence(frm = '%s@%s/%s' % (room.encode('hex'),chathostname,nick), to= fromjid, typ = 'unavailable'))
                 
     def xmpp_iq_browse(self, con, event):
         m = Iq(to = event.getFrom(), frm = event.getTo(), typ = 'result', queryNS = NS_BROWSE)
