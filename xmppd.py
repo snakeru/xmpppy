@@ -14,11 +14,13 @@
 ##   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ##   GNU General Public License for more details.
 
-# $Id: xmppd.py,v 1.4 2004-09-19 20:20:05 snakeru Exp $
+# $Id: xmppd.py,v 1.5 2004-10-03 17:45:34 snakeru Exp $
 
 from xmpp import *
-import socket,select,random,os,modules
-from psyco.classes import *
+if __name__=='__main__':
+    print "Firing up PsyCo"
+    from psyco.classes import *
+import socket,select,random,os,modules,thread
 """
 _socket_state live/dead
 _auth_state   no/in-process/yes
@@ -38,14 +40,15 @@ STREAM_CLOSED     =4
 class Session:
     def __init__(self,socket,server,peer=None):
         host,port=socket.getsockname()
-        self.xmlns=[NS_SERVER]
+        self.xmlns=None
         if peer:
             self.TYP='client'
             self.peer=peer
         else:
             self.TYP='server'
-            if port in [5222,5223]: self.xmlns.append(NS_CLIENT)
+            if port in [5222,5223]: self.xmlns=NS_CLIENT
             if port==5223: server.TLS.starttls(self)
+            self.peer=None
         self._sock=socket
         self._send=socket.send
         self._recv=socket.recv
@@ -109,19 +112,17 @@ class Session:
         elif attrs.has_key('to'):
             text+=' from="%s" id="%s"'%(attrs['to'],self.ID)
         if attrs.has_key('xml:lang'): text+=' xml:lang="%s"'%attrs['xml:lang']
-        if self.TYP=='client': xmlns=NS_SERVER
-        elif self.Stream.xmlns in self.xmlns: xmlns=self.Stream.xmlns
-        else: xmlns=self.xmlns[0]
+        if self.xmlns: xmlns=self.xmlns
+        else: xmlns=NS_SERVER
         text+=' xmlns:xmpp="%s" xmlns:stream="%s" xmlns="%s" version="1.0"'%(NS_STANZAS,NS_STREAMS,xmlns)
-        self.Stream.nsvoc={NS_STREAMS:'stream',NS_STANZAS:'xmpp'}
         self.send(text+'>')
         self.set_stream_state(STREAM_OPENED)
         if self.TYP=='client': return
-        if tag<>'stream': return self.terminate_stream(ERR_INVALID_XML)
-        if ns<>NS_STREAMS: return self.terminate_stream(ERR_INVALID_NAMESPACE)
-        if self.Stream.xmlns not in self.xmlns: return self.terminate_stream(ERR_BAD_NAMESPACE_PREFIX)
-        if not attrs.has_key('to'): return self.terminate_stream(ERR_IMPROPER_ADDRESSING)
-        if attrs['to'] not in self._owner.servernames: return self.terminate_stream(ERR_HOST_UNKNOWN)
+        if tag<>'stream': return self.terminate_stream(STREAM_INVALID_XML)
+        if ns<>NS_STREAMS: return self.terminate_stream(STREAM_INVALID_NAMESPACE)
+        if self.Stream.xmlns<>self.xmlns: return self.terminate_stream(STREAM_BAD_NAMESPACE_PREFIX)
+        if not attrs.has_key('to'): return self.terminate_stream(STREAM_IMPROPER_ADDRESSING)
+        if attrs['to'] not in self._owner.servernames: return self.terminate_stream(STREAM_HOST_UNKNOWN)
         self.servername=attrs['to'].lower()
         if self.TYP=='server': self.send_features()
 
@@ -146,22 +147,28 @@ class Session:
     def unfeature(self,feature):
         if feature in self.waiting_features: self.waiting_features.remove(feature)
 
-    def _stream_close(self):
+    def _stream_close(self,unregister=1):
         if self._stream_state>=STREAM_CLOSED: return
+        self.set_stream_state(STREAM_CLOSING)
         self.send('</stream:stream>')
         self.set_stream_state(STREAM_CLOSED)
-        self._owner.unregistersession(self)
+        if unregister: self._owner.unregistersession(self)
+        self._destroy_socket()
 
-    def terminate_stream(self,error=None):
+    def terminate_stream(self,error=None,unregister=1):
         if self._stream_state>=STREAM_CLOSING: return
         if self._stream_state<STREAM_OPENED:
             self.set_stream_state(STREAM_CLOSING)
             self._stream_open()
+        else:
+            p=Presence(typ='unavailable')
+            p.setNamespace(NS_CLIENT)
+            self.Dispatcher.dispatch(p,self)
         self.set_stream_state(STREAM_CLOSING)
         if error:
             if isinstance(error,Node): self.send(error)
             else: self.send(ErrorNode(error))
-        self._stream_close()
+        self._stream_close(unregister=unregister)
 
     def _destroy_socket(self):
         """ breaking cyclic dependancy to let python's GC free memory just now """
@@ -194,6 +201,7 @@ class Server:
         self.debug_flags.append('dispatcher')
         self.debug_flags.append('server')
 
+        self.SESS_LOCK=thread.allocate_lock()
         for port in [5222,5223,5269]:
             sock=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.bind(('', port+0))
@@ -205,58 +213,63 @@ class Server:
         self.Dispatcher._init()
 
         self.features=[]
-        for addon in modules.addons: addon().PlugIn(self)
+        for addon in modules.addons:
+            if issubclass(addon,PlugIn): addon().PlugIn(self)
+            else: self.__dict__[addon.__class__.__name__]=addon()
+            self.feature(addon.NS)
         self.routes={}
 
     def feature(self,feature):
-        if feature not in self.features: self.features.append(feature)
+        if feature and feature not in self.features: self.features.append(feature)
 
     def enqueue(self,session,stanza):
         if session._stream_state>=STREAM_CLOSED or session._socket_state>=SOCKET_DEAD: return
         if type(stanza)==type(u''): stanza = stanza.encode('utf-8')
-        elif type(stanza)<>type(''): stanza = stanza.__str__(nsvoc=session.Stream.nsvoc).encode('utf-8')
+        elif type(stanza)<>type(''): stanza = stanza.__str__().encode('utf-8')
         """ TODO: Here not send actually but enqueue. """
         try:
             session._send(stanza)
             session.DEBUG(stanza,'sent')
         except:
+            session.set_socket_state(SOCKET_DEAD)
             session.DEBUG("Socket error while sending data",'error')
             session.terminate_stream()
 
     def registersession(self,s):
+        self.SESS_LOCK.acquire()
         self.sockets[s.fileno()]=s
         self.sockpoll.register(s,select.POLLIN | select.POLLPRI | select.POLLERR | select.POLLHUP)
         self.DEBUG('server','registered %s (%s)'%(s.fileno(),s))
-
-    def registersession(self,s):
-        self.sockets[s.fileno()]=s
-        self.sockpoll.register(s,select.POLLIN | select.POLLPRI | select.POLLERR | select.POLLHUP)
-        self.DEBUG('server','registered %s (%s)'%(s.fileno(),s))
+        self.SESS_LOCK.release()
 
     def unregistersession(self,s):
+        self.SESS_LOCK.acquire()
         if isinstance(s,Session):
             if s._socket_state>=SOCKET_UNREGISTERED:
+                self.SESS_LOCK.release()
                 if self._DEBUG.active: raise "Twice session unregistration!"
                 else: return
             s.set_socket_state(SOCKET_UNREGISTERED)
         self.sockpoll.unregister(s)
         del self.sockets[s.fileno()]
-        if isinstance(s,Session): s._destroy_socket() # destructor. Bug workaround.
-        else: s.shutdown(2); s.close()
+        self.DEBUG('server','UNregistered %s (%s)'%(s.fileno(),s))
+        self.SESS_LOCK.release()
 
-    def activatesession(self,s):
-        self.deactivatesession(s.peer)
-        self.routes[s.peer]=s
+    def activatesession(self,s,peer=None):
+        if not peer: peer=s.peer
+        alt_s=self.getsession(peer)
+        if s==alt_s: return
+        elif alt_s: self.deactivatesession(peer)
+        self.routes[peer]=s
 
-    def getsession(self, fulljid):
-        try: return self.routes[fulljid]
+    def getsession(self, jid):
+        try: return self.routes[jid]
         except KeyError: pass
 
-    def deactivatesession(self, fulljid):
-        s=self.getsession(fulljid)
-        if s:
-            del self.routes[s.peer]
-            s.terminate_stream(ERR_CONFLICT)
+    def deactivatesession(self, peer):
+        s=self.getsession(peer)
+        if self.routes.has_key(peer): del self.routes[peer]
+        return s
 
     def handle(self):
         for fileno,ev in self.sockpoll.poll():
@@ -271,7 +284,7 @@ class Server:
                     try:
                         sess.Parse(data)
                     except simplexml.xml.parsers.expat.ExpatError:
-                        sess.terminate_stream(ERR_XML_NOT_WELL_FORMED)
+                        sess.terminate_stream(STREAM_XML_NOT_WELL_FORMED)
                         del sess,sock
             elif isinstance(sock,socket.socket):
 #            elif sock.typ in [CLIENT, SSLCLIENT, SERVER]:
@@ -281,9 +294,6 @@ class Server:
             else: raise "Unknown socket type: %s"%sock.typ
 
     def run(self):
-        import psyco
-        psyco.log()
-        psyco.full()
         try:
             while 1: self.handle()
         except KeyboardInterrupt:
@@ -295,8 +305,24 @@ class Server:
         socklist=self.sockets.keys()
         for fileno in socklist:
             s=self.sockets[fileno]
-            if isinstance(s,socket.socket): self.unregistersession(s)
-            elif isinstance(s,Session): s.terminate_stream(ERR_SYSTEM_SHUTDOWN)
+            if isinstance(s,socket.socket):
+                self.unregistersession(s)
+                s.shutdown(2)
+                s.close()
+            elif isinstance(s,Session): s.terminate_stream(STREAM_SYSTEM_SHUTDOWN)
+
+    def Privacy(self,peer,stanza): pass
+
+def test(server):
+    conn=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    conn.connect(('127.0.0.1',5222))
+    sess=Session(conn,server,'localhost')
+    server.registersession(sess)
 
 s=Server()
-if __name__=='__main__': s.run()
+if __name__=='__main__':
+    print "Firing up PsyCo"
+    import psyco
+    psyco.log()
+    psyco.full()
+    s.run()
