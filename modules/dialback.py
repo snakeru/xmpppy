@@ -2,7 +2,7 @@
 # Copyright (C) Alexey Nezhdanov 2004
 # Dialback module for xmppd.py
 
-# $Id: dialback.py,v 1.1 2004-10-23 07:45:10 snakeru Exp $
+# $Id: dialback.py,v 1.2 2004-10-24 04:37:19 snakeru Exp $
 
 from xmpp import *
 from xmppd import *
@@ -28,19 +28,19 @@ class Dialback(PlugIn):
         name=stanza.getName()
         if to not in self._owner.servernames:
             self.DEBUG('Received dialback key for unknown server.','error')
-            session.terminate_stream(STREAM_INVALID_ADDRESSING)
+            session.terminate_stream(STREAM_HOST_UNKNOWN)
         elif not frm or frm<>frm.getDomain():
             self.DEBUG('Received dialback key from invalid server.','error')
-            session.terminate_stream(STREAM_INVALID_ADDRESSING)
+            session.terminate_stream(STREAM_INVALID_FROM)
         elif name=='result' and session.TYP=='server':
             # (4) Received an dialback key. We should verify it.
             key=stanza.getData()
             self.DEBUG('Received dialback key %s (%s->%s).'%(`key`,frm,to),'info')
             # Now we should form a request and send it to authoritative server
-            req=Node('db:verify',{'from':to,'to':frm,'id':session.ID},[key])
+            req=Node('db:verify',{'from':session.ourname,'to':frm,'id':session.ID},[key])
             s=self._owner.getsession(frm)
             if not s:
-                s=self._owner.S2S(session.ourname,frm.getDomain())
+                s=self._owner.S2S(session.ourname,frm.getDomain(),slave_session=session)
             s.send(req)
             if self.waitlist.has_key(frm):
                 self.waitlist[frm][1].terminate_stream(STREAM_CONFLICT)
@@ -66,6 +66,8 @@ class Dialback(PlugIn):
                     else:
                         s.peer=frm
                         s.set_session_state(SESSION_AUTHED)
+                else:
+                    session.terminate_stream(STREAM_INVALID_ID) # it will terminate "initial stream" also
         elif name=='result' and session.TYP=='client':
             # (10) Received the result. Either we will be terminated now or authorized.
             if stanza['type']=='valid':
