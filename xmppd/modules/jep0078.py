@@ -15,7 +15,7 @@ class NSA(PlugIn):
 
     def getAuthInfoHandler(self,session,stanza):
         servername=stanza['to']
-        if servername not in self._owner.servernames:
+        if servername and servername not in self._owner.servernames:
             session.send(Error(stanza,ERR_ITEM_NOT_FOUND))
         else:
             iq=stanza.buildReply('result')
@@ -29,11 +29,12 @@ class NSA(PlugIn):
     def setAuthInfoHandler(self,session,stanza):
         servername=stanza['to'].getDomain().lower()
         username=stanza.T.query.T.username.getData().lower()
-        password=self._owner.AUTH.getpassword(servername,username)
-        digest=sha.new(session.ID+password).hexdigest()
+        password=self._owner.AUTH.getpassword(username,servername)
+        if password is not None: digest=sha.new(session.ID+password).hexdigest()
         if servername not in self._owner.servernames:
             iq=Error(stanza,ERR_ITEM_NOT_FOUND)
-        elif session.servername==servername \
+        elif session.ourname==servername \
+          and password \
           and (stanza.T.query.T.password.getData()==password \
            or stanza.T.query.T.digest.getData()==digest ) \
           and stanza.T.query.T.resource.getData():
@@ -42,6 +43,7 @@ class NSA(PlugIn):
             session.peer=fulljid
             s=self._owner.deactivatesession(fulljid)
             if s: s.terminate_stream(STREAM_CONFLICT)
+            session.set_auth_state('SESSION_OPENED')
         else:
             iq=stanza.buildReply('error')
         session.send(iq)
