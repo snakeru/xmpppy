@@ -56,7 +56,6 @@ class Session:
         self._send=socket.send
         self._recv=socket.recv
         self._registered=0
-        self.trusted=0
 
         self.Dispatcher=server.Dispatcher
         self.DBG_LINE='session'
@@ -108,7 +107,7 @@ class Session:
             raise IOError("Peer disconnected")
         return received
 
-    def send(self,chunk):
+    def sendnow(self,chunk):
         if isinstance(chunk,Node): chunk = chunk.__str__().encode('utf-8')
         elif type(chunk)==type(u''): chunk = chunk.encode('utf-8')
         self.enqueue(chunk)
@@ -126,11 +125,10 @@ class Session:
 
         if self._stream_state>=STREAM__CLOSED or self._socket_state>=SOCKET_DEAD: # the stream failed. Return all stanzas that are still waiting for delivery.
             self._owner.deactivatesession(self)
-            self.trusted=1
-            for key in self.deliver_key_queue:                            # Not sure. May be I
-                self.dispatch(Error(self.deliver_queue_map[key],failreason))                                          # should simply re-dispatch it?
-            for stanza in self.stanza_queue:                              # But such action can invoke
-                self.dispatch(Error(stanza,failreason))                                          # Infinite loops in case of S2S connection...
+            for key in self.deliver_key_queue:                                         # Not sure. May be I
+                self.dispatch(Error(self.deliver_queue_map[key],failreason),trusted=1) # should simply re-dispatch it?
+            for stanza in self.stanza_queue:                                           # But such action can invoke
+                self.dispatch(Error(stanza,failreason),trusted=1)                      # Infinite loops in case of S2S connection...
             self.deliver_queue_map,self.deliver_key_queue,self.stanza_queue={},[],[]
             return
         elif self._session_state>=SESSION_AUTHED:       # FIXME! Должен быть какой-то другой флаг.
@@ -162,9 +160,10 @@ class Session:
                 self.deliver_key_queue.remove(self.deliver_key_queue[0])
             # UNLOCK_QUEUE
 
-    def dispatch(self,stanza):
-        if self._stream_state==STREAM__OPENED:                  # if the server really should reject all stanzas after he is closed stream (himeself)?
+    def dispatch(self,stanza,trusted=0):
+        if self._stream_state==STREAM__OPENED or trusted:               # if the server really should reject all stanzas after he is closed stream (himeself)?
             self.DEBUG(stanza.__str__(),'dispatch')
+            stanza.trusted=trusted
             return self.Dispatcher.dispatch(stanza,self)
 
     def fileno(self): return self._sock.fileno()
@@ -188,7 +187,7 @@ class Session:
         else: xmlns=NS_SERVER
         text+=' xmlns:db="%s" xmlns:stream="%s" xmlns="%s"'%(NS_DIALBACK,NS_STREAMS,xmlns)
         if attrs.has_key('version') or self.TYP=='client': text+=' version="1.0"'
-        self.send(text+'>')
+        self.sendnow(text+'>')
         self.set_stream_state(STREAM__OPENED)
         if self.TYP=='client': return
         if tag<>'stream': return self.terminate_stream(STREAM_INVALID_XML)
@@ -211,7 +210,7 @@ class Session:
         else:
             if NS_BIND in self.waiting_features: features.T.bind.setNamespace(NS_BIND)
             if NS_SESSION in self.waiting_features: features.T.session.setNamespace(NS_SESSION)
-        self.send(features)
+        self.sendnow(features)
 
     def feature(self,feature):
         if feature not in self.features: self.features.append(feature)
@@ -223,7 +222,7 @@ class Session:
     def _stream_close(self,unregister=1):
         if self._stream_state>=STREAM__CLOSED: return
         self.set_stream_state(STREAM__CLOSING)
-        self.send('</stream:stream>')
+        self.sendnow('</stream:stream>')
         self.set_stream_state(STREAM__CLOSED)
         self.push_queue()       # decompose queue really since STREAM__CLOSED
         if unregister: self._owner.unregistersession(self)
@@ -238,10 +237,10 @@ class Session:
             self.set_stream_state(STREAM__CLOSING)
             p=Presence(typ='unavailable')
             p.setNamespace(NS_CLIENT)
-            self.Dispatcher.dispatch(p,self)
+            self.dispatch(p,trusted=1)
         if error:
-            if isinstance(error,Node): self.send(error)
-            else: self.send(ErrorNode(error))
+            if isinstance(error,Node): self.sendnow(error)
+            else: self.sendnow(ErrorNode(error))
         self._stream_close(unregister=unregister)
         if self.slave_session:
             self.slave_session.terminate_stream(STREAM_REMOTE_CONNECTION_FAILED)
@@ -268,7 +267,7 @@ class Session:
             if self._session_state<SESSION_AUTHED and \
                newstate>=SESSION_AUTHED: self._stream_pos_queued=self._stream_pos_sent
             self._session_state=newstate
-            if newstate==SESSION_OPENED: self.enqueue(Message(self.peer,Revision,frm=self.ourname))     # Remove in prod. quality server
+#            if newstate==SESSION_OPENED: self.enqueue(Message(self.peer,Revision,frm=self.ourname))     # Remove in prod. quality server
     def set_stream_state(self,newstate):
         if self._stream_state<newstate: self._stream_state=newstate
 
@@ -301,7 +300,7 @@ class Server:
         for port in [5222,5223,5269]:
             sock=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.bind(('', port))
+            sock.bind((self.servernames[0], port))
             sock.listen(1)
             self.registersession(sock)
 
