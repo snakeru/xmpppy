@@ -63,7 +63,8 @@ class Session:
         self.DEBUG=server.Dispatcher.DEBUG
         self._expected={}
         self._owner=server
-        self.ID=`random.random()`[2:]
+        if self.TYP=='server': self.ID=`random.random()`[2:]
+        else: self.ID=None
 
         self.sendbuffer=''
         self._stream_pos_queued=None
@@ -72,12 +73,13 @@ class Session:
         self.deliver_queue_map={}
         self.stanza_queue=[]
 
-        self.StartStream()
         self._session_state=SESSION_NOT_AUTHED
         self.waiting_features=[]
         for feature in [NS_TLS,NS_SASL,NS_BIND,NS_SESSION]:
             if feature in server.features: self.waiting_features.append(feature)
         self.features=[]
+        self.feature_in_process=None
+        self.StartStream()
 
     def StartStream(self):
         self._stream_state=STREAM__NOT_OPENED
@@ -86,22 +88,19 @@ class Session:
         self.Stream.dispatch=self.dispatch
         self.Parse=self.Stream.Parse
         self.Stream.stream_footer_received=self._stream_close
-        if self.TYP=='client': self._stream_open()
-        else: self.Stream.stream_header_received=self._stream_open
+        if self.TYP=='client':
+            self.Stream.stream_header_received=self._catch_stream_id
+            self._stream_open()
+        else:
+            self.Stream.stream_header_received=self._stream_open
 
     def receive(self):
         """Reads all pending incoming data. Raises IOError on disconnect."""
-        try: received = self._recv(1024)
+        try: received = self._recv(10240)
         except: received = ''
 
-        while select.select([self._sock],[],[],0)[0]:
-            try: add = self._recv(1024)
-            except: add=''
-            received +=add
-            if not add: break
-
         if len(received): # length of 0 means disconnect
-            self.DEBUG(received,'got')
+            self.DEBUG(`self._sock.fileno()`+' '+received,'got')
         else:
             self.DEBUG('Socket error while receiving data','error')
             self.set_socket_state(SOCKET_DEAD)
@@ -153,7 +152,7 @@ class Session:
                 self.set_socket_state(SOCKET_DEAD)
                 self.DEBUG("Socket error while sending data",'error')
                 return self.terminate_stream()
-            self.DEBUG(self.sendbuffer[:sent],'sent')
+            self.DEBUG(`self._sock.fileno()`+' '+self.sendbuffer[:sent],'sent')
             self._stream_pos_sent+=sent
             self.sendbuffer=self.sendbuffer[sent:]
             self._stream_pos_delivered=self._stream_pos_sent            # Should be acquired from socket somehow. Take SSL into account.
@@ -169,6 +168,12 @@ class Session:
 
     def fileno(self): return self._sock.fileno()
 
+    def _catch_stream_id(self,ns=None,tag='stream',attrs={}):
+        if not attrs.has_key('id') or not attrs['id']:
+            return self.terminate_stream(STREAM_INVALID_XML)
+        self.ID=attrs['id']
+        if not attrs.has_key('version'): self._owner.Dialback(self)
+
     def _stream_open(self,ns=None,tag='stream',attrs={}):
         text='<?xml version="1.0" encoding="utf-8"?>\n<stream:stream'
         if self.TYP=='client':
@@ -180,8 +185,8 @@ class Session:
         if attrs.has_key('xml:lang'): text+=' xml:lang="%s"'%attrs['xml:lang']
         if self.xmlns: xmlns=self.xmlns
         else: xmlns=NS_SERVER
-        text+=' xmlns:xmpp="%s" xmlns:stream="%s" xmlns="%s"'%(NS_STANZAS,NS_STREAMS,xmlns)
-        if attrs.has_key('version'): text+=' version="1.0"'
+        text+=' xmlns:db="%s" xmlns:stream="%s" xmlns="%s"'%(NS_DIALBACK,NS_STREAMS,xmlns)
+        if attrs.has_key('version') or self.TYP=='client': text+=' version="1.0"'
         self.send(text+'>')
         self.set_stream_state(STREAM__OPENED)
         if self.TYP=='client': return
@@ -247,6 +252,12 @@ class Session:
         self._sock.close()
         self.set_socket_state(SOCKET_DEAD)
 
+    def start_feature(self,f):
+        if self.feature_in_process: raise "Starting feature %s over %s !"%(f,self.feature_in_process)
+        self.feature_in_process=f
+    def stop_feature(self,f):
+        if self.feature_in_process<>f: raise "Stopping feature %s instead of %s !"%(f,self.feature_in_process)
+        self.feature_in_process=None
     def set_socket_state(self,newstate):
         if self._socket_state<newstate: self._socket_state=newstate
     def set_session_state(self,newstate):
@@ -262,6 +273,7 @@ class Server:
     def __init__(self,debug=['always']):
         self.sockets={}
         self.sockpoll=select.poll()
+        self.ID=`random.random()`[2:]
 
         self._DEBUG=Debug.Debug(debug)
         self.DEBUG=self._DEBUG.Show
@@ -336,7 +348,7 @@ class Server:
         return s
 
     def handle(self):
-        for fileno,ev in self.sockpoll.poll(1):
+        for fileno,ev in self.sockpoll.poll(1000):
             sock=self.sockets[fileno]
             if isinstance(sock,Session):
                 sess=sock
@@ -349,7 +361,6 @@ class Server:
                         sess.Parse(data)
                     except simplexml.xml.parsers.expat.ExpatError:
                         sess.terminate_stream(STREAM_XML_NOT_WELL_FORMED)
-                        del sess,sock
             elif isinstance(sock,socket.socket):
                 conn, addr = sock.accept()
                 host,port=sock.getsockname()
@@ -364,10 +375,10 @@ class Server:
             while 1: self.handle()
         except KeyboardInterrupt:
             self.DEBUG('server','Shutting down on user\'s behalf','info')
-            self.shutdown()
-#        except: self.shutdown(); raise
+            self.shutdown(STREAM_SYSTEM_SHUTDOWN)
+#        except: self.shutdown(STREAM_INTERNAL_SERVER_ERROR); raise
 
-    def shutdown(self):
+    def shutdown(self,reason):
         socklist=self.sockets.keys()
         for fileno in socklist:
             s=self.sockets[fileno]
@@ -375,7 +386,7 @@ class Server:
                 self.unregistersession(s)
                 s.shutdown(2)
                 s.close()
-            elif isinstance(s,Session): s.terminate_stream(STREAM_SYSTEM_SHUTDOWN)
+            elif isinstance(s,Session): s.terminate_stream(reason)
 
     def S2S(self,ourname,domain):
         s=Session(socket.socket(socket.AF_INET, socket.SOCK_STREAM),self,NS_SERVER,domain)
@@ -400,6 +411,17 @@ class Server:
         self.registersession(session)
 
     def Privacy(self,peer,stanza): pass
+    def Dialback(self,session):
+        session.terminate_stream(STREAM_UNSUPPORTED_VERSION)
+
+def start_new_thread_fake(func,args):
+    func(*args)
+
+def testrun():
+    thread.start_new_thread=start_new_thread_fake
+    import modules
+    modules.stream.thread.start_new_thread=start_new_thread_fake
+    return Server()
 
 if __name__=='__main__':
     s=Server()
