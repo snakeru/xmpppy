@@ -20,6 +20,9 @@ class Config(PlugIn):
         configfile.add_section('server')
         configfile.readfp(open('xmppd.cfg','r'))
         server.servernames=[]
-        for name in configfile.get('server','servername').split(','):
+        for name in configfile.get('server','servernames').split(','):
             server.servernames.append(name.strip())
-        server.sslcertfile=configfile.get('server','ssl-cert')
+        try: server.sslcertfile=configfile.get('server','ssl-cert')
+        except: server.sslcertfile=None
+        try: server.sslkeyfile=configfile.get('server','ssl-key')
+        except: server.sslkeyfile=server.sslcertfile

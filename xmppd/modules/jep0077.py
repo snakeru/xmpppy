@@ -9,8 +9,8 @@ from xmpp import *
 
 class IBR(PlugIn):
     def plugin(self,server):
-        server.dispatcher.RegisterHandler('iq',self.getRegInfoHandler,'get',NS_REGISTER)
-        server.dispatcher.RegisterHandler('iq',self.setRegInfoHandler,'set',NS_REGISTER)
+        server.Dispatcher.RegisterHandler('iq',self.getRegInfoHandler,'get',NS_REGISTER)
+        server.Dispatcher.RegisterHandler('iq',self.setRegInfoHandler,'set',NS_REGISTER)
 
     def getRegInfoHandler(self,sess,stanza):
         name=stanza['to']
