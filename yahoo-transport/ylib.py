@@ -6,6 +6,7 @@ from yahoo_helpers import *
 import socket, time
 import avatar
 import re
+import random
 
 
 
@@ -18,7 +19,7 @@ class YahooCon:
     confpingojb = None
     session = 0
     host = 'cs1.msg.dcn.yahoo.com'
-    hostlist = ['cs17.msg.dcn.yahoo.com','cs18.msg.dcn.yahoo.com','cs40.msg.dcn.yahoo.com','cs41.msg.dcn.yahoo.com','cs42.msg.dcn.yahoo.com','cs43.msg.dcn.yahoo.com','cs44.msg.dcn.yahoo.com','cs45.msg.dcn.yahoo.com','cs46.msg.dcn.yahoo.com','cs50.msg.sc5.yahoo.com','cs51.msg.sc5.yahoo.com','cs52.msg.sc5.yahoo.com']
+    hostlist = ['cs1.msg.dcn.yahoo.com','cs2.msg.dcn.yahoo.com','cs3.msg.dcn.yahoo.com','cs4.msg.dcn.yahoo.com','cs5.msg.dcn.yahoo.com','cs6.msg.dcn.yahoo.com','cs7.msg.dcn.yahoo.com','cs8.msg.dcn.yahoo.com','cs9.msg.dcn.yahoo.com','cs10.msg.dcn.yahoo.com','cs11.msg.dcn.yahoo.com','cs12.msg.dcn.yahoo.com','cs13.msg.dcn.yahoo.com','cs14.msg.dcn.yahoo.com','cs15.msg.dcn.yahoo.com','cs16.msg.dcn.yahoo.com','cs17.msg.dcn.yahoo.com','cs18.msg.dcn.yahoo.com','cs40.msg.dcn.yahoo.com','cs41.msg.dcn.yahoo.com','cs42.msg.dcn.yahoo.com','cs43.msg.dcn.yahoo.com','cs44.msg.dcn.yahoo.com','cs45.msg.dcn.yahoo.com','cs46.msg.dcn.yahoo.com','cs50.msg.dcn.yahoo.com','cs51.msg.dcn.yahoo.com','cs52.msg.dcn.yahoo.com']
     port = 5050
     version = 0x000c0000
     sock = None
@@ -27,7 +28,6 @@ class YahooCon:
     # Tuple by availabilaity, show value, status message
     roster = {}
     handlers = {}
-    resources = {}
     # login -- on sucessful login
     # loginfail -- on login failure
     
@@ -49,7 +49,10 @@ class YahooCon:
         self.connok = False
         self.conncount = 0
         self.cookies = []
-    
+        self.resources = {}
+        self.xresources = {}
+        self.offset = int(random.random()*len(self.hostlist))
+        
     # utility methods
     def connect(self):
         self.connok=False
@@ -59,7 +62,7 @@ class YahooCon:
             self.sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
             self.sock.bind((self.fromhost,0))
             try:
-                if not self.sock.connect((self.hostlist[self.conncount],self.port)):
+                if not self.sock.connect((self.hostlist[(self.offset+self.conncount)%len(self.hostlist)],self.port)):
                     self.conncount = self.conncount + 1
                     return self.sock
             except socket.error:
@@ -313,6 +316,8 @@ class YahooCon:
                 
     def ymsg_ping(self, hdr, pay):
         #print "got lib ping"
+        self.secpingtime = 13
+        self.pripingtime = 3
         if pay[0].has_key(143):
             self.secpingtime = float(pay[0][143])
         else:
@@ -398,7 +403,11 @@ class YahooCon:
                 self.handlers['roommessagefail'](self, pay[0][109], pay[0][104], msg)
     
     def ymsg_init(self):
-        return self.sock.send(self.ymsg_send_challenge())
+        try:
+            return self.sock.send(self.ymsg_send_challenge())
+        except:
+            if self.handlers.has_key('loginfail'):
+                self.handlers['loginfail'](self)
     
     def ymsg_send_init(self):
         return ymsg_mkhdr(self.version,0,Y_init,0,0)
@@ -576,6 +585,30 @@ class YahooCon:
         hdr = ymsg_mkhdr(self.version, len(pay), Y_away,0,self.session)
         return hdr+pay
 
+    def ymsg_recv_challenge(self,hdr,pay):
+        # Function to determine the error type and then send that to the main process
+        if pay[0].has_key(66):
+            #All the error cases are shown with a different code in the 66 field. Unfortunately we cannot process image ID at this time.
+            if pay[0][66] == '3':
+                #Bad username case
+                if self.handlers.has_key('loginfail'):
+                        self.handlers['loginfail'](self,'badusername')
+            elif pay[0][66] == '13':
+                #Bad password case
+                if self.handlers.has_key('loginfail'):
+                        self.handlers['loginfail'](self,'badpassword')
+            elif pay[0][66] == '29':
+                #Account requires image verify
+                if self.handlers.has_key('loginfail'):
+                        self.handlers['loginfail'](self,'imageverify')
+            elif pay[0][66] == '14':
+                #Account locked
+                if self.handlers.has_key('loginfail'):
+                        self.handlers['loginfail'](self,'locked')
+            else:
+                if self.handlers.has_key('loginfail'):
+                        self.handlers['loginfail'](self)
+
     def Process(self):
         r = self.sock.recv(1024)
         #print r
@@ -600,8 +633,7 @@ class YahooCon:
                     self.ymsg_login(s,t)
                 elif s[3] == Y_challenge:       #84
                     # login failed
-                    if self.handlers.has_key('loginfail'):
-                        self.handlers['loginfail'](self)
+                    self.ymsg_recv_challenge(s,t)
                 elif s[3] == Y_online:          #1
                     self.ymsg_online(s,t)
                 elif s[3] == Y_offline:         #2
