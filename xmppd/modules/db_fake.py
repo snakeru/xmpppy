@@ -8,10 +8,8 @@ from xmpp import *
 
 db={}
 db['localhost']={}
-db['80.95.32.177']={}
 db['localhost']['test']='test'
 db['localhost']['test2']='test'
-db['80.95.32.177']['test']='test'
 
 class AUTH(PlugIn):
     NS=''
