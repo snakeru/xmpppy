@@ -14,46 +14,49 @@
 ##   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ##   GNU General Public License for more details.
 
-# $Id$
+Revision="$Id$"[5:41].replace(',v',' Rev:')
 
 from xmpp import *
 if __name__=='__main__':
     print "Firing up PsyCo"
     from psyco.classes import *
-import socket,select,random,os,modules,thread
+import socket,select,random,os,thread,errno
 """
 _socket_state live/dead
-_auth_state   no/in-process/yes
+_session_state   no/in-process/yes
 _stream_state not-opened/opened/closing/closed
 """
+# Transport-level flags
+SOCKET_UNCONNECTED  =0
 SOCKET_ALIVE        =1
 SOCKET_DEAD         =2
-SOCKET_UNREGISTERED =3
+# XML-level flags
+STREAM__NOT_OPENED =1
+STREAM__OPENED     =2
+STREAM__CLOSING    =3
+STREAM__CLOSED     =4
+# XMPP-session flags
 SESSION_NOT_AUTHED =1
 SESSION_AUTHED     =2
 SESSION_BOUND      =3
 SESSION_OPENED     =4
-STREAM_NOT_OPENED =1
-STREAM_OPENED     =2
-STREAM_CLOSING    =3
-STREAM_CLOSED     =4
 
 class Session:
-    def __init__(self,socket,server,peer=None):
-        host,port=socket.getsockname()
-        self.xmlns=None
+    def __init__(self,socket,server,xmlns,peer=None):
+        self.xmlns=xmlns
         if peer:
             self.TYP='client'
             self.peer=peer
+            self._socket_state=SOCKET_UNCONNECTED
         else:
             self.TYP='server'
-            if port in [5222,5223]: self.xmlns=NS_CLIENT
-            if port==5223: server.TLS.starttls(self)
             self.peer=None
+            self._socket_state=SOCKET_ALIVE
         self._sock=socket
         self._send=socket.send
         self._recv=socket.recv
-        self._socket_state=SOCKET_ALIVE
+        self._registered=0
+        self.trusted=0
 
         self.Dispatcher=server.Dispatcher
         self.DBG_LINE='session'
@@ -61,21 +64,23 @@ class Session:
         self._expected={}
         self._owner=server
         self.ID=`random.random()`[2:]
+
+        self.sendbuffer=''
+        self._stream_pos_queued=None
+        self._stream_pos_sent=0
+        self.deliver_key_queue=[]
+        self.deliver_queue_map={}
+        self.stanza_queue=[]
+
         self.StartStream()
-        self._auth_state=SESSION_NOT_AUTHED
+        self._session_state=SESSION_NOT_AUTHED
         self.waiting_features=[]
         for feature in [NS_TLS,NS_SASL,NS_BIND,NS_SESSION]:
             if feature in server.features: self.waiting_features.append(feature)
         self.features=[]
 
-        self.sendbuffer=''
-        self._stream_pos_queued=0
-        self._stream_pos_sent=0
-        self.send_key_queue=[]
-        self.send_queue={}
-
     def StartStream(self):
-        self._stream_state=STREAM_NOT_OPENED
+        self._stream_state=STREAM__NOT_OPENED
         self.Stream=simplexml.NodeBuilder()
         self.Stream._dispatch_depth=2
         self.Stream.dispatch=self.dispatch
@@ -103,44 +108,63 @@ class Session:
             raise IOError("Peer disconnected")
         return received
 
-    def enqueue(self,stanza):
-        if type(stanza)==type(u''): txt = stanza.encode('utf-8')
-        elif type(stanza)<>type(''): txt = stanza.__str__().encode('utf-8')
-        else: txt = stanza
-        # LOCK_QUEUE
-        self.sendbuffer+=txt
-        self._stream_pos_queued+=len(txt)       # should be re-evaluated for SSL connection.
-        if isinstance(stanza,Protocol):
-            self.send_queue[self._stream_pos_queued]=stanza     # position of the stream when stanza will be successfully and fully sent
-            self.send_key_queue.append(self._stream_pos_queued)
-        # UNLOCK_QUEUE
-        self.push_queue()
-    send=enqueue
+    def send(self,chunk):
+        if isinstance(chunk,Node): chunk = str(chunk).encode('utf-8')
+        elif type(chunk)==type(u''): chunk = chunk.encode('utf-8')
+        self.enqueue(chunk)
 
-    def push_queue(self):
-        if self._stream_state>=STREAM_CLOSED or self._socket_state>=SOCKET_DEAD:
-            while self.send_key_queue:
-                pass
-#                self._owner.decompose_queue(self)
+    def enqueue(self,stanza):
+        """ Takes Protocol instance as argument. """
+        if isinstance(stanza,Protocol):
+            self.stanza_queue.append(stanza)
+        else: self.sendbuffer+=stanza
+        if self._socket_state>=SOCKET_ALIVE: self.push_queue()
+
+    def push_queue(self,failreason=ERR_RECIPIENT_UNAVAILABLE):
+        # Если уже пора - преобразовать stanza_queue в sendbuffer и расставить контрольные точки
+        # Попытаться отправить send_buffer
+
+        if self._stream_state>=STREAM__CLOSED or self._socket_state>=SOCKET_DEAD: # the stream failed. Return all stanzas that are still waiting for delivery.
+            self._owner.deactivatesession(self)
+            self.trusted=1
+            for key in self.deliver_key_queue:                            # Not sure. May be I
+                self.dispatch(Error(self.deliver_queue_map[key],failreason))                                          # should simply re-dispatch it?
+            for stanza in self.stanza_queue:                              # But such action can invoke
+                self.dispatch(Error(stanza,failreason))                                          # Infinite loops in case of S2S connection...
+            self.deliver_queue_map,self.deliver_key_queue,self.stanza_queue={},[],[]
             return
-        try:
-            # LOCK_QUEUE
-            sent=self._send(self.sendbuffer)
-        except:
+        elif self._session_state>=SESSION_AUTHED:       # FIXME! Должен быть какой-то другой флаг.
+            #### LOCK_QUEUE
+            for stanza in self.stanza_queue:
+                txt=stanza.__str__().encode('utf-8')
+                self.sendbuffer+=txt
+                self._stream_pos_queued+=len(txt)       # should be re-evaluated for SSL connection.
+                self.deliver_queue_map[self._stream_pos_queued]=stanza     # position of the stream when stanza will be successfully and fully sent
+                self.deliver_key_queue.append(self._stream_pos_queued)
+            self.stanza_queue=[]
+            #### UNLOCK_QUEUE
+
+        if self.sendbuffer and select.select([],[self._sock],[])[1]:
+            try:
+                # LOCK_QUEUE
+                sent=self._send(self.sendbuffer)    # Блокирующая штучка!
+            except:
+                # UNLOCK_QUEUE
+                self.set_socket_state(SOCKET_DEAD)
+                self.DEBUG("Socket error while sending data",'error')
+                return self.terminate_stream()
+            self.DEBUG(self.sendbuffer[:sent],'sent')
+            self._stream_pos_sent+=sent
+            self.sendbuffer=self.sendbuffer[sent:]
+            self._stream_pos_delivered=self._stream_pos_sent            # Should be acquired from socket somehow. Take SSL into account.
+            while self.deliver_key_queue and self._stream_pos_delivered>self.deliver_key_queue[0]:
+                del self.deliver_queue_map[self.deliver_key_queue[0]]
+                self.deliver_key_queue.remove(self.deliver_key_queue[0])
             # UNLOCK_QUEUE
-            self.set_socket_state(SOCKET_DEAD)
-            self.DEBUG("Socket error while sending data",'error')
-            return self.terminate_stream()
-        self.DEBUG(self.sendbuffer[:sent],'sent')
-        self._stream_pos_sent+=sent
-        self.sendbuffer=self.sendbuffer[sent:]
-        while self.send_key_queue and self._stream_pos_sent>self.send_key_queue[0]:
-            del self.send_queue[self.send_key_queue[0]]
-            self.send_key_queue.remove(self.send_key_queue[0])
-        # UNLOCK_QUEUE
 
     def dispatch(self,stanza):
-        if self._stream_state==STREAM_OPENED:                  # if the server really should reject all stanzas after he is closed stream (himeself)?
+        if self._stream_state==STREAM__OPENED:                  # if the server really should reject all stanzas after he is closed stream (himeself)?
+            self.DEBUG(stanza.__str__(),'dispatch')
             return self.Dispatcher.dispatch(stanza,self)
 
     def fileno(self): return self._sock.fileno()
@@ -159,7 +183,7 @@ class Session:
         text+=' xmlns:xmpp="%s" xmlns:stream="%s" xmlns="%s"'%(NS_STANZAS,NS_STREAMS,xmlns)
         if attrs.has_key('version'): text+=' version="1.0"'
         self.send(text+'>')
-        self.set_stream_state(STREAM_OPENED)
+        self.set_stream_state(STREAM__OPENED)
         if self.TYP=='client': return
         if tag<>'stream': return self.terminate_stream(STREAM_INVALID_XML)
         if ns<>NS_STREAMS: return self.terminate_stream(STREAM_INVALID_NAMESPACE)
@@ -191,20 +215,21 @@ class Session:
         if feature in self.waiting_features: self.waiting_features.remove(feature)
 
     def _stream_close(self,unregister=1):
-        if self._stream_state>=STREAM_CLOSED: return
-        self.set_stream_state(STREAM_CLOSING)
+        if self._stream_state>=STREAM__CLOSED: return
+        self.set_stream_state(STREAM__CLOSING)
         self.send('</stream:stream>')
-        self.set_stream_state(STREAM_CLOSED)
+        self.set_stream_state(STREAM__CLOSED)
+        self.push_queue()       # decompose queue really since STREAM__CLOSED
         if unregister: self._owner.unregistersession(self)
         self._destroy_socket()
 
     def terminate_stream(self,error=None,unregister=1):
-        if self._stream_state>=STREAM_CLOSING: return
-        if self._stream_state<STREAM_OPENED:
-            self.set_stream_state(STREAM_CLOSING)
+        if self._stream_state>=STREAM__CLOSING: return
+        if self._stream_state<STREAM__OPENED:
+            self.set_stream_state(STREAM__CLOSING)
             self._stream_open()
         else:
-            self.set_stream_state(STREAM_CLOSING)
+            self.set_stream_state(STREAM__CLOSING)
             p=Presence(typ='unavailable')
             p.setNamespace(NS_CLIENT)
             self.Dispatcher.dispatch(p,self)
@@ -223,13 +248,14 @@ class Session:
         self.set_socket_state(SOCKET_DEAD)
 
     def set_socket_state(self,newstate):
-        if type(newstate)==type(''): newstate=globals()[newstate]
         if self._socket_state<newstate: self._socket_state=newstate
-    def set_auth_state(self,newstate):
-        if type(newstate)==type(''): newstate=globals()[newstate]
-        if self._auth_state<newstate: self._auth_state=newstate
+    def set_session_state(self,newstate):
+        if self._session_state<newstate:
+            if self._session_state<SESSION_AUTHED and \
+               newstate>=SESSION_AUTHED: self._stream_pos_queued=self._stream_pos_sent
+            self._session_state=newstate
+            if newstate==SESSION_OPENED: self.enqueue(Message(self.peer,Revision,frm=self.ourname))     # Remove in prod. quality server
     def set_stream_state(self,newstate):
-        if type(newstate)==type(''): newstate=globals()[newstate]
         if self._stream_state<newstate: self._stream_state=newstate
 
 class Server:
@@ -245,29 +271,36 @@ class Server:
         self.debug_flags.append('server')
 
         self.SESS_LOCK=thread.allocate_lock()
-        for port in [5222,5223,5269]:
-            sock=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.bind(('', port+0))
-            sock.listen(1)
-            self.registersession(sock)
-
         self.Dispatcher=dispatcher.Dispatcher()
         self.Dispatcher._owner=self
         self.Dispatcher._init()
 
         self.features=[]
+        import modules
         for addon in modules.addons:
             if issubclass(addon,PlugIn): addon().PlugIn(self)
             else: self.__dict__[addon.__class__.__name__]=addon()
             self.feature(addon.NS)
         self.routes={}
 
+        for port in [5222,5223,5269]:
+            sock=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind(('', port))
+            sock.listen(1)
+            self.registersession(sock)
+
     def feature(self,feature):
         if feature and feature not in self.features: self.features.append(feature)
 
     def registersession(self,s):
         self.SESS_LOCK.acquire()
+        if isinstance(s,Session):
+            if s._registered:
+                self.SESS_LOCK.release()
+                if self._DEBUG.active: raise "Twice session Registration!"
+                else: return
+            s._registered=1
         self.sockets[s.fileno()]=s
         self.sockpoll.register(s,select.POLLIN | select.POLLPRI | select.POLLERR | select.POLLHUP)
         self.DEBUG('server','registered %s (%s)'%(s.fileno(),s))
@@ -276,11 +309,11 @@ class Server:
     def unregistersession(self,s):
         self.SESS_LOCK.acquire()
         if isinstance(s,Session):
-            if s._socket_state>=SOCKET_UNREGISTERED:
+            if not s._registered:
                 self.SESS_LOCK.release()
-                if self._DEBUG.active: raise "Twice session unregistration!"
+                if self._DEBUG.active: raise "Twice session UNregistration!"
                 else: return
-            s.set_socket_state(SOCKET_UNREGISTERED)
+            s._registered=0
         self.sockpoll.unregister(s)
         del self.sockets[s.fileno()]
         self.DEBUG('server','UNregistered %s (%s)'%(s.fileno(),s))
@@ -303,7 +336,7 @@ class Server:
         return s
 
     def handle(self):
-        for fileno,ev in self.sockpoll.poll():
+        for fileno,ev in self.sockpoll.poll(1):
             sock=self.sockets[fileno]
             if isinstance(sock,Session):
                 sess=sock
@@ -318,11 +351,13 @@ class Server:
                         sess.terminate_stream(STREAM_XML_NOT_WELL_FORMED)
                         del sess,sock
             elif isinstance(sock,socket.socket):
-#            elif sock.typ in [CLIENT, SSLCLIENT, SERVER]:
                 conn, addr = sock.accept()
-                sess=Session(conn,self)      # behaive as server - announce features, etc.
+                host,port=sock.getsockname()
+                if port in [5222,5223]: sess=Session(conn,self,NS_CLIENT)
+                else: sess=Session(conn,self,NS_SERVER)
                 self.registersession(sess)
-            else: raise "Unknown socket type: %s"%sock.typ
+                if port==5223: self.TLS.startservertls(sess)
+            else: raise "Unknown instance type: %s"%sock
 
     def run(self):
         try:
@@ -342,16 +377,32 @@ class Server:
                 s.close()
             elif isinstance(s,Session): s.terminate_stream(STREAM_SYSTEM_SHUTDOWN)
 
+    def S2S(self,ourname,domain):
+        s=Session(socket.socket(socket.AF_INET, socket.SOCK_STREAM),self,NS_SERVER,domain)
+        s.ourname=ourname
+        self.activatesession(s)
+        thread.start_new_thread(self._connect_session,(s,domain))
+        return s
+
+    def _connect_session(self,session,domain):
+        try: session._sock.connect((domain,5269))
+        except socket.error,err:
+            session.set_session_state(SESSION_BOUND)
+            session.set_socket_state(SOCKET_DEAD)
+            if err[0]==errno.ETIMEDOUT: failreason=ERR_REMOTE_SERVER_TIMEOUT
+            elif err[0]==socket.EAI_NONAME: failreason=ERR_REMOTE_SERVER_NOT_FOUND
+            else: failreason=ERR_UNDEFINED_CONDITION
+            session.push_queue(failreason)
+            session.terminate_stream(unregister=0)
+            return
+        session.set_socket_state(SOCKET_ALIVE)
+        session.push_queue()
+        self.registersession(session)
+
     def Privacy(self,peer,stanza): pass
 
-def test(server):
-    conn=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    conn.connect(('127.0.0.1',5222))
-    sess=Session(conn,server,'localhost')
-    server.registersession(sess)
-
-s=Server()
 if __name__=='__main__':
+    s=Server()
     print "Firing up PsyCo"
     import psyco
     psyco.log()
