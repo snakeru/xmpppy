@@ -2,7 +2,7 @@
 # Copyright (C) Alexey Nezhdanov 2004
 # AUTH_db interface example for xmppd.py
 
-# $Id: db_fake.py,v 1.2 2004-10-03 17:48:09 snakeru Exp $
+# $Id: db_fake.py,v 1.3 2004-10-08 19:08:38 snakeru Exp $
 
 from xmpp import *
 
@@ -15,11 +15,12 @@ db['80.95.32.177']['test']='test'
 
 class AUTH(PlugIn):
     NS=''
-    def getpassword(self, authzid, authcid):
-        try: return db[authzid][authcid]
+    def getpassword(self, username, domain):
+        try: return db[domain][username]
         except KeyError: pass
-    def isuser(self, authzid, authcid):
-        try: return db[authzid].has_key(authcid)
+
+    def isuser(self, username, domain):
+        try: return db[domain].has_key(username)
         except KeyError: pass
 
 class DB(PlugIn):
