@@ -2,7 +2,7 @@
 # Copyright (C) Alexey Nezhdanov 2004
 # router, presence tracker and probes responder for xmppd.py
 
-# $Id: router.py,v 1.1 2004-10-03 17:27:19 snakeru Exp $
+# $Id: router.py,v 1.2 2004-10-08 19:17:22 snakeru Exp $
 
 from xmpp import *
 
@@ -23,7 +23,7 @@ class Router(PlugIn):
         to=stanza['to']
         if  to and (
             to.getDomain().lower() not in self._owner.servernames or
-            to.getNode() ) or not session.peer:
+            to.getNode() ):
                 return
 
         typ=stanza.getType()
@@ -77,13 +77,44 @@ class Router(PlugIn):
         else: self._owner.deactivatesession(barejid)
 
     def routerHandler(self,session,stanza):
-        if not session.peer: return
-        if stanza.getNamespace()==NS_CLIENT: stanza.setFrom(session.peer)
-        elif not stanza.getAttr('from'): raise NodeProcessed # just drop it
-        to=stanza['to']
-        if not to: return # stanza.setTo(session.servername)
-        domain=to.getDomain().lower()
+        """ XMPP-Core 9.1.1 rules """
         name=stanza.getName()
+        self.DEBUG('Router handler called','info')
+
+        to=stanza['to']
+        if (not to or to in self._owner.servernames) and \
+            (NS_AUTH in stanza.props or NS_REGISTER in stanza.props): return # Security hole to allow Non-SASL auth
+
+        ## safeguard start
+        if session._auth_state<3:       # NOT BOUND yet (stream's stuff already done)
+            session.terminate_stream(STREAM_NOT_AUTHORIZED)
+            raise NodeProcessed
+
+        frm=stanza['from']
+        if stanza.getNamespace()==NS_SERVER:
+            if not frm or not to \
+              or frm.getDomain()<>session.peer \
+              or to.getDomain()<>session.ourname:
+                session.terminate_stream(STREAM_IMPROPER_ADDRESSING)
+                raise NodeProcessed
+        else:
+            if frm and frm<>session.peer:   # if the from address specified and differs
+                if frm.getResource() or not frm.bareMatch(session.peer): # ...it can differ only while comparing inequally
+                    session.terminate_stream(STREAM_INVALID_FROM)
+                    raise NodeProcessed
+
+            if session._auth_state<3:   # NOT BOUND yet (bind stuff already done)
+                session.send(Error(stanza,ERR_NOT_AUTHORIZED))
+                raise NodeProcessed
+
+            if name=='presence' and session._auth_state<4:
+                session.send(Error(stanza,ERR_NOT_ALLOWED))
+                raise NodeProcessed
+            stanza.setFrom(session.peer)
+        ## safeguard stop
+
+        if not to: return # stanza.setTo(session.ourname)
+        domain=to.getDomain().lower()
 
         if domain in self._owner.servernames:
             node=to.getNode().lower()
@@ -105,7 +136,7 @@ class Router(PlugIn):
 #    nor return an error) if it is a presence stanza, (b) MUST return a <service-unavailable/> stanza error 
 #    to the sender if it is an IQ stanza, and (c) SHOULD return a <service-unavailable/> stanza error to the 
 #    sender if it is a message stanza.
-            if not self._owner.AUTH.isuser(domain,node):
+            if not self._owner.AUTH.isuser(node,domain):
                 if name in ['iq','message']:
                     session.send(Error(stanza,ERR_SERVICE_UNAVAILABLE))
                 raise NodeProcessed
