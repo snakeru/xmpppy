@@ -14,7 +14,7 @@
 ##   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ##   GNU General Public License for more details.
 
-# $Id: xmppd.py,v 1.5 2004-10-03 17:45:34 snakeru Exp $
+# $Id: xmppd.py,v 1.6 2004-10-08 19:06:41 snakeru Exp $
 
 from xmpp import *
 if __name__=='__main__':
@@ -29,9 +29,10 @@ _stream_state not-opened/opened/closing/closed
 SOCKET_ALIVE        =1
 SOCKET_DEAD         =2
 SOCKET_UNREGISTERED =3
-NOT_AUTHED =1
-AUTHED     =2
-BOUND      =3
+SESSION_NOT_AUTHED =1
+SESSION_AUTHED     =2
+SESSION_BOUND      =3
+SESSION_OPENED     =4
 STREAM_NOT_OPENED =1
 STREAM_OPENED     =2
 STREAM_CLOSING    =3
@@ -61,11 +62,17 @@ class Session:
         self._owner=server
         self.ID=`random.random()`[2:]
         self.StartStream()
-        self._auth_state=NOT_AUTHED
+        self._auth_state=SESSION_NOT_AUTHED
         self.waiting_features=[]
         for feature in [NS_TLS,NS_SASL,NS_BIND,NS_SESSION]:
             if feature in server.features: self.waiting_features.append(feature)
         self.features=[]
+
+        self.sendbuffer=''
+        self._stream_pos_queued=0
+        self._stream_pos_sent=0
+        self.send_key_queue=[]
+        self.send_queue={}
 
     def StartStream(self):
         self._stream_state=STREAM_NOT_OPENED
@@ -96,8 +103,41 @@ class Session:
             raise IOError("Peer disconnected")
         return received
 
-    def send(self,stanza):
-        self._owner.enqueue(self,stanza)
+    def enqueue(self,stanza):
+        if type(stanza)==type(u''): txt = stanza.encode('utf-8')
+        elif type(stanza)<>type(''): txt = stanza.__str__().encode('utf-8')
+        else: txt = stanza
+        # LOCK_QUEUE
+        self.sendbuffer+=txt
+        self._stream_pos_queued+=len(txt)       # should be re-evaluated for SSL connection.
+        if isinstance(stanza,Protocol):
+            self.send_queue[self._stream_pos_queued]=stanza     # position of the stream when stanza will be successfully and fully sent
+            self.send_key_queue.append(self._stream_pos_queued)
+        # UNLOCK_QUEUE
+        self.push_queue()
+    send=enqueue
+
+    def push_queue(self):
+        if self._stream_state>=STREAM_CLOSED or self._socket_state>=SOCKET_DEAD:
+            while self.send_key_queue:
+                pass
+#                self._owner.decompose_queue(self)
+            return
+        try:
+            # LOCK_QUEUE
+            sent=self._send(self.sendbuffer)
+        except:
+            # UNLOCK_QUEUE
+            self.set_socket_state(SOCKET_DEAD)
+            self.DEBUG("Socket error while sending data",'error')
+            return self.terminate_stream()
+        self.DEBUG(self.sendbuffer[:sent],'sent')
+        self._stream_pos_sent+=sent
+        self.sendbuffer=self.sendbuffer[sent:]
+        while self.send_key_queue and self._stream_pos_sent>self.send_key_queue[0]:
+            del self.send_queue[self.send_key_queue[0]]
+            self.send_key_queue.remove(self.send_key_queue[0])
+        # UNLOCK_QUEUE
 
     def dispatch(self,stanza):
         if self._stream_state==STREAM_OPENED:                  # if the server really should reject all stanzas after he is closed stream (himeself)?
@@ -109,12 +149,15 @@ class Session:
         text='<?xml version="1.0" encoding="utf-8"?>\n<stream:stream'
         if self.TYP=='client':
             text+=' to="%s"'%self.peer
-        elif attrs.has_key('to'):
-            text+=' from="%s" id="%s"'%(attrs['to'],self.ID)
+        else:
+            text+=' id="%s"'%self.ID
+            if not attrs.has_key('to'): text+=' from="%s"'%self._owner.servernames[0]
+            else: text+=' from="%s"'%attrs['to']
         if attrs.has_key('xml:lang'): text+=' xml:lang="%s"'%attrs['xml:lang']
         if self.xmlns: xmlns=self.xmlns
         else: xmlns=NS_SERVER
-        text+=' xmlns:xmpp="%s" xmlns:stream="%s" xmlns="%s" version="1.0"'%(NS_STANZAS,NS_STREAMS,xmlns)
+        text+=' xmlns:xmpp="%s" xmlns:stream="%s" xmlns="%s"'%(NS_STANZAS,NS_STREAMS,xmlns)
+        if attrs.has_key('version'): text+=' version="1.0"'
         self.send(text+'>')
         self.set_stream_state(STREAM_OPENED)
         if self.TYP=='client': return
@@ -123,8 +166,8 @@ class Session:
         if self.Stream.xmlns<>self.xmlns: return self.terminate_stream(STREAM_BAD_NAMESPACE_PREFIX)
         if not attrs.has_key('to'): return self.terminate_stream(STREAM_IMPROPER_ADDRESSING)
         if attrs['to'] not in self._owner.servernames: return self.terminate_stream(STREAM_HOST_UNKNOWN)
-        self.servername=attrs['to'].lower()
-        if self.TYP=='server': self.send_features()
+        self.ourname=attrs['to'].lower()
+        if self.TYP=='server' and attrs.has_key('version'): self.send_features()
 
     def send_features(self):
         features=Node('stream:features')
@@ -161,10 +204,10 @@ class Session:
             self.set_stream_state(STREAM_CLOSING)
             self._stream_open()
         else:
+            self.set_stream_state(STREAM_CLOSING)
             p=Presence(typ='unavailable')
             p.setNamespace(NS_CLIENT)
             self.Dispatcher.dispatch(p,self)
-        self.set_stream_state(STREAM_CLOSING)
         if error:
             if isinstance(error,Node): self.send(error)
             else: self.send(ErrorNode(error))
@@ -221,19 +264,6 @@ class Server:
 
     def feature(self,feature):
         if feature and feature not in self.features: self.features.append(feature)
-
-    def enqueue(self,session,stanza):
-        if session._stream_state>=STREAM_CLOSED or session._socket_state>=SOCKET_DEAD: return
-        if type(stanza)==type(u''): stanza = stanza.encode('utf-8')
-        elif type(stanza)<>type(''): stanza = stanza.__str__().encode('utf-8')
-        """ TODO: Here not send actually but enqueue. """
-        try:
-            session._send(stanza)
-            session.DEBUG(stanza,'sent')
-        except:
-            session.set_socket_state(SOCKET_DEAD)
-            session.DEBUG("Socket error while sending data",'error')
-            session.terminate_stream()
 
     def registersession(self,s):
         self.SESS_LOCK.acquire()
