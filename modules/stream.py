@@ -1,12 +1,11 @@
-#!/usr/bin/python
 # Distributed under the terms of GPL version 2 or any later
 # Copyright (C) Alexey Nezhdanov 2004
 # Stream-level features for xmppd.py
 
-# $Id: stream.py,v 1.2 2004-09-19 20:20:05 snakeru Exp $
+# $Id: stream.py,v 1.3 2004-10-03 17:51:30 snakeru Exp $
 
 from xmpp import *
-import socket
+import socket,thread
 from tlslite.api import *
 
 class TLS(PlugIn):
@@ -15,12 +14,12 @@ class TLS(PlugIn):
         5.                        <proceed/> / <failure/>
         -- NEW STREAM / connection close --
         """
+    NS=NS_TLS
     def plugin(self,server):
         server.Dispatcher.RegisterHandler('starttls',self.starttlsHandler,xmlns=NS_TLS)
         server.Dispatcher.RegisterHandler('proceed',self.proceedfailureHandler,xmlns=NS_TLS)
         server.Dispatcher.RegisterHandler('failure',self.proceedfailureHandler,xmlns=NS_TLS)
         server.Dispatcher.RegisterHandler('features',self.FeaturesHandler,xmlns=NS_STREAMS)
-        server.feature(NS_TLS)
 
     def starttlsHandler(self,session,stanza):
         if 'tls' in session.features:
@@ -39,9 +38,8 @@ class TLS(PlugIn):
             self.DEBUG('TLS startup failure: can\'t find SSL cert/key file[s].','error')
             session.unfeature(NS_TLS)
             raise NodeProcessed
-        session.send(Node('proceed',{'xmlns':NS_TLS}))
-        self.startservertls(session)
-        session.StartStream()
+        session._owner.unregistersession(session)
+        thread.start_new_thread(self.startservertls,(session,))
         raise NodeProcessed
 
     def startservertls(self,session):
@@ -50,21 +48,28 @@ class TLS(PlugIn):
             key=open(self._owner.sslkeyfile).read()
         except:
             session.unfeature(NS_TLS)
-            raise NodeProcessed
+            session.send(Node('failure',{'xmlns':NS_TLS}))
+            session._owner.registersession(session)
+            return
 
-        self.DEBUG('Starting server-mode TLS.','ok')
+        session.send(Node('proceed',{'xmlns':NS_TLS}))
         x509 = X509()
         x509.parse(cert)
         certChain = X509CertChain([x509])
         privateKey = parsePEMKey(key, private=True)
         connection = TLSConnection(session._sock)
-        connection.handshakeServer(certChain=certChain, privateKey=privateKey, reqCert=False)
+        try: connection.handshakeServer(certChain=certChain, privateKey=privateKey, reqCert=False)
+        except:
+            session.terminate_stream(unregister=0)
+            return
 
         session._sslObj = connection
         session._recv = connection.read
         session._send = connection.write
 
         session.feature(NS_TLS)
+        session.StartStream()
+        session._owner.registersession(session)
 
     def proceedfailureHandler(self,session,stanza):
         if stanza.getName()<>'proceed':
@@ -101,6 +106,7 @@ def H(some): return md5.new(some).digest()
 def C(some): return ':'.join(some)
 
 class SASL(PlugIn):
+    NS=NS_SASL
     """ 3.                        <features/>
         4. <auth/>
         5.                        <challenge/> / <failure/>
@@ -120,7 +126,6 @@ class SASL(PlugIn):
         server.Dispatcher.RegisterNamespaceHandler(NS_SASL,self.SASLHandler)
         server.Dispatcher.RegisterHandler('features',self.FeaturesHandler,xmlns=NS_STREAMS)
         self.mechanisms=['PLAIN']#,'DIGEST-MD5']  # for announce in <features/> tag
-        server.feature(NS_SASL)
 
     def startauth(self,session,username,password):
         session.username=username
@@ -181,12 +186,12 @@ class SASL(PlugIn):
             else: session.sasl['next']=['challenge','success','failure']
         if stanza.getName() not in session.sasl['next']:
             # screwed SASL implementation on the other side. terminating stream
-            session.terminate_stream(ERR_BAD_REQUEST)
+            session.terminate_stream(STREAM_BAD_REQUEST)
             raise NodeProcessed
         #=================== preparation ===============================================
         try: data=base64.decodestring(stanza.getData())
         except:
-            session.terminate_stream(ERR_BAD_REQUEST)
+            session.terminate_stream(STREAM_BAD_REQUEST)
             raise NodeProcessed
         self.DEBUG('Got challenge:'+data,'ok')
         for pair in data.split(','):
@@ -268,32 +273,36 @@ class SASL(PlugIn):
         raise NodeProcessed
 
 class Bind(PlugIn):
+    NS=NS_BIND
     def plugin(self,server):
         server.Dispatcher.RegisterHandler('iq',self.bindHandler,typ='set',ns=NS_BIND)
-        server.Dispatcher.RegisterHandler('iq',self.sessionHandler,typ='set',ns=NS_SESSION)
-        server.feature(NS_BIND)
-        server.feature(NS_SESSION)
 
     def bindHandler(self,session,stanza):
-        if session.TYP=='client' or session.__dict__.has_key('resource'):
+        if session.xmlns<>NS_CLIENT or session.__dict__.has_key('resource'):
             session.send(Error(stanza,ERR_SERVICE_UNAVAILABLE))
         else:
             resource=stanza.getTag('bind',namespace=NS_BIND).T.resource.getData()
             if not resource: resource=session.ID
             fulljid="%s@%s/%s"%(session.username,session.servername,resource)
             session.peer=fulljid
-            self._owner.deactivatesession(fulljid)
+            s=self._owner.deactivatesession(fulljid)
+            if s: s.terminate_stream(STREAM_CONFLICT)
             rep=stanza.buildReply('result')
             rep.T.bind.setNamespace(NS_BIND)
             rep.T.bind.T.jid=fulljid
             session.send(rep)
         raise NodeProcessed
 
+class Session(PlugIn):
+    NS=NS_SESSION
+    def plugin(self,server):
+        server.Dispatcher.RegisterHandler('iq',self.sessionHandler,typ='set',ns=NS_SESSION)
+
     def sessionHandler(self,session,stanza):
-        if session.TYP=='client' or not session.__dict__.has_key('peer') \
+        if session.xmlns<>NS_CLIENT \
+          or not session.peer \
           or self._owner.getsession(session.peer)==session:
             session.send(Error(stanza,ERR_SERVICE_UNAVAILABLE))
         else:
-            self._owner.activatesession(session)
             session.send(stanza.buildReply('result'))
         raise NodeProcessed
