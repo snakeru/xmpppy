@@ -1,4 +1,4 @@
-# $Id: __init__.py,v 1.4 2004-10-23 08:58:45 snakeru Exp $
+# $Id: __init__.py,v 1.5 2004-10-25 11:55:30 snakeru Exp $
 
 import os
 #from psyco.classes import *
@@ -23,6 +23,8 @@ addons = [
     stream.Session,
     router.Router,
 #    privacy.Privacy,
+    roster.Roster,
+    roster.vCard,
 
 # JEPs
 #    jep0077.IBR,
