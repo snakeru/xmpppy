@@ -1,7 +1,7 @@
 The xmppd.py version 0.2 is a minimal XMPP server. It is so minimal that it
 lacks even a roster implementation and offline message delivery support.
-In fact - it complies [almost] only to XMPP Core (RFC).
-I have not read XMPP IM yet ;)
+In fact - it complies [almost] only to XMPP Core (RFC 3920).
+I have not read XMPP IM (RFC 3921) yet ;)
 
 xmppd.py is under development now. The goals of this development can be found
 here: http://www.saint-andre.com/blog/2004-08.html#2004-08-10T17:01
