@@ -2,16 +2,14 @@
 # Copyright (C) Alexey Nezhdanov 2004
 # AUTH_db interface example for xmppd.py
 
-# $Id: db_fake.py,v 1.3 2004-10-08 19:08:38 snakeru Exp $
+# $Id: db_fake.py,v 1.4 2004-10-24 04:49:09 snakeru Exp $
 
 from xmpp import *
 
 db={}
 db['localhost']={}
-db['80.95.32.177']={}
 db['localhost']['test']='test'
 db['localhost']['test2']='test'
-db['80.95.32.177']['test']='test'
 
 class AUTH(PlugIn):
     NS=''
