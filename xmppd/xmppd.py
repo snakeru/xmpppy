@@ -109,7 +109,7 @@ class Session:
         return received
 
     def send(self,chunk):
-        if isinstance(chunk,Node): chunk = str(chunk).encode('utf-8')
+        if isinstance(chunk,Node): chunk = chunk.__str__().encode('utf-8')
         elif type(chunk)==type(u''): chunk = chunk.encode('utf-8')
         self.enqueue(chunk)
 
