@@ -16,12 +16,13 @@ addons = [
 # XMPP-Core
     stream.TLS,
     stream.SASL,
+    dialback.Dialback,
 
 # XMPP-IM
     stream.Bind,
     stream.Session,
-#    privacy.Privacy,
     router.Router,
+#    privacy.Privacy,
 
 # JEPs
 #    jep0077.IBR,
