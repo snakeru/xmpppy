@@ -124,10 +124,10 @@ class SASL(PlugIn):
 
     def plugin(self,server):
         server.Dispatcher.RegisterNamespaceHandler(NS_SASL,self.SASLHandler)
-        server.Dispatcher.RegisterHandler('features',self.FeaturesHandler,xmlns=NS_STREAMS)
+#        server.Dispatcher.RegisterHandler('features',self.FeaturesHandler,xmlns=NS_STREAMS)
         self.mechanisms=['PLAIN']#,'DIGEST-MD5']  # for announce in <features/> tag
 
-    def startauth(self,session,username,password):
+    """    def startauth(self,session,username,password):
         session.username=username
         session.password=password
         if session.Stream.features:
@@ -155,25 +155,26 @@ class SASL(PlugIn):
         session.startsasl='in-process'
         session.send(node.__str__())
         raise NodeProcessed
-
-    def commit_auth(self,session,authcid):
+"""
+    def commit_auth(self,session,authzid):
         session.send(Node('success',{'xmlns':NS_SASL}))
         session.feature(NS_SASL)
         session.unfeature(NS_TLS)
         session.sasl['next']=[]
         session.StartStream()
-        session.username=authcid.lower()
-        session.set_auth_state('AUTHED')
-        self.DEBUG('Peer %s@%s successfully authenticated'%(authcid,session.servername),'ok')
+        session.peer=authzid.lower()
+        if session.xmlns==NS_CLIENT: session.set_auth_state('SESSION_AUTHED')
+        else: session.set_auth_state('SESSION_BOUND')
+        self.DEBUG('Peer %s@%s successfully authenticated'%authzid,'ok')
 
-    def reject_auth(self,session,authcid='unknown'):
+    def reject_auth(self,session,authzid='unknown'):
         session.send(Node('failure',{'xmlns':NS_SASL},[Node('not-authorized')]))
         session.sasl['retries']=session.sasl['retries']-1
         if session.sasl['retries']<=0: session.terminate_stream()
-        self.DEBUG('Peer %s@%s failed to authenticate'%(authcid,session.servername),'error')
+        self.DEBUG('Peer %s@%s failed to authenticate'%authzid,'error')
 
     def SASLHandler(self,session,stanza):
-        """simple username: node _or_ servername
+        """simple username: servername _or_ node@servername : 6.1 (6)
         """
         if NS_SASL in session.features:
             self.DEBUG('Already authorized. Ignoring SASL stanza.','error')
@@ -218,17 +219,20 @@ class SASL(PlugIn):
                    password."""
                 if session.sasl.has_key('otherdata'): pack=session.sasl['otherdata'].split('\000')
                 else: pack=[]
+                authzid=session.peer
                 if len(pack)<>3: res=0
                 else:
                     authzid, authcid, passwd = pack
-                    res = ( passwd == self._owner.AUTH.getpassword(session.servername, authcid) )
-                if res: self.commit_auth(session,authcid)
-                else: self.reject_auth(session,authcid)
+                    if not authzid: authzid=authcid
+                    username=authzid.split('@')[0]
+                    res = ( passwd == self._owner.AUTH.getpassword(username, authcid) )
+                if res: self.commit_auth(session,authzid)
+                else: self.reject_auth(session,authzid)
             elif mec=='DIGEST-MD5': pass
             else:
                 session.terminate_stream(Node('failure',{'xmlns':NS_SASL},[Node('invalid-mechanism')]))
             raise NodeProcessed
-        elif stanza.getName()=='challenge':
+            """elif stanza.getName()=='challenge':
             session.sasl['next']=['challenge','success','failure']
             # DIGEST-MD5 only
             if chal.has_key('qop') and chal['qop']=='auth':
@@ -255,6 +259,7 @@ class SASL(PlugIn):
                 node=Node('response',attrs={'xmlns':NS_SASL},payload=[base64.encodestring(sasl_data[:-1]).replace('\n','')])
                 self._owner.send(node.__str__())
             elif chal.has_key('rspauth'): self._owner.send(Node('response',attrs={'xmlns':NS_SASL}).__str__())
+"""
         elif stanza.getName()=='response':
             session.sasl['next']=['response','abort']
         elif stanza.getName()=='abort':
@@ -281,9 +286,12 @@ class Bind(PlugIn):
         if session.xmlns<>NS_CLIENT or session.__dict__.has_key('resource'):
             session.send(Error(stanza,ERR_SERVICE_UNAVAILABLE))
         else:
+            if session._auth_state<2:
+                session.terminate_stream(STREAM_NOT_AUTHORIZED)
+                raise NodeProcessed
             resource=stanza.getTag('bind',namespace=NS_BIND).T.resource.getData()
             if not resource: resource=session.ID
-            fulljid="%s@%s/%s"%(session.username,session.servername,resource)
+            fulljid="%s/%s"%(session.peer,resource)
             session.peer=fulljid
             s=self._owner.deactivatesession(fulljid)
             if s: s.terminate_stream(STREAM_CONFLICT)
@@ -291,6 +299,7 @@ class Bind(PlugIn):
             rep.T.bind.setNamespace(NS_BIND)
             rep.T.bind.T.jid=fulljid
             session.send(rep)
+            session.set_auth_state('SESSION_BOUND')
         raise NodeProcessed
 
 class Session(PlugIn):
@@ -299,10 +308,14 @@ class Session(PlugIn):
         server.Dispatcher.RegisterHandler('iq',self.sessionHandler,typ='set',ns=NS_SESSION)
 
     def sessionHandler(self,session,stanza):
+        if session._auth_state<2:
+            session.terminate_stream(STREAM_NOT_AUTHORIZED)
+            raise NodeProcessed
         if session.xmlns<>NS_CLIENT \
-          or not session.peer \
+          or session._auth_state<3 \
           or self._owner.getsession(session.peer)==session:
             session.send(Error(stanza,ERR_SERVICE_UNAVAILABLE))
         else:
+            session.set_auth_state('SESSION_OPENED')
             session.send(stanza.buildReply('result'))
         raise NodeProcessed
