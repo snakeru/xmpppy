@@ -17,14 +17,14 @@ class NSA(PlugIn):
     def getAuthInfoHandler(self,session,stanza):
         servername=stanza['to']
         if servername and servername not in self._owner.servernames:
-            session.send(Error(stanza,ERR_ITEM_NOT_FOUND))
+            session.sendnow(Error(stanza,ERR_ITEM_NOT_FOUND))
         else:
             iq=stanza.buildReply('result')
             iq.T.query.T.username=stanza.T.query.T.username
             iq.T.query.T.password
             iq.T.query.T.digest
             iq.T.query.T.resource
-            session.send(iq)
+            session.sendnow(iq)
         raise NodeProcessed
 
     def setAuthInfoHandler(self,session,stanza):
@@ -34,18 +34,18 @@ class NSA(PlugIn):
         password=self._owner.AUTH.getpassword(username,servername)
         if password is not None: digest=sha.new(session.ID+password).hexdigest()
         if servername not in self._owner.servernames:
-            session.send(Error(stanza,ERR_ITEM_NOT_FOUND))
+            session.sendnow(Error(stanza,ERR_ITEM_NOT_FOUND))
         elif session.ourname==servername \
           and password \
           and (stanza.T.query.T.password.getData()==password \
            or stanza.T.query.T.digest.getData()==digest ) \
           and stanza.T.query.T.resource.getData():
-            session.send(stanza.buildReply('result'))
+            session.sendnow(stanza.buildReply('result'))
             fulljid="%s@%s/%s"%(username,servername,stanza.T.query.T.resource.getData())
             session.peer=fulljid
             s=self._owner.deactivatesession(fulljid)
             if s: s.terminate_stream(STREAM_CONFLICT)
             session.set_session_state(SESSION_OPENED)
         else:
-            session.send(stanza.buildReply('error'))
+            session.sendnow(stanza.buildReply('error'))
         raise NodeProcessed

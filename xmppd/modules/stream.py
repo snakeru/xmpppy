@@ -24,7 +24,7 @@ class TLS(PlugIn):
 
     def starttlsHandler(self,session,stanza):
         if 'tls' in session.features:
-            session.send(Node('failure',{'xmlns':NS_TLS}))
+            session.sendnow(Node('failure',{'xmlns':NS_TLS}))
             self.DEBUG('TLS startup failure: already started.','error')
             session.unfeature(NS_TLS)
             raise NodeProcessed
@@ -35,12 +35,12 @@ class TLS(PlugIn):
         try: open(certfile) ; open(keyfile)
         except: certfile=None
         if not certfile or not keyfile:
-            session.send(Node('failure',{'xmlns':NS_TLS}))
+            session.sendnow(Node('failure',{'xmlns':NS_TLS}))
             self.DEBUG('TLS startup failure: can\'t find SSL cert/key file[s].','error')
             session.unfeature(NS_TLS)    # do not declare TLS anymore
             session.stop_feature(NS_TLS) # TLS finished, let another features start
         else:
-            session.send(Node('proceed',{'xmlns':NS_TLS}))
+            session.sendnow(Node('proceed',{'xmlns':NS_TLS}))
             self.startservertls(session)
         raise NodeProcessed
 
@@ -104,7 +104,7 @@ class TLS(PlugIn):
         else:
             self.DEBUG("TLS supported by remote server. Requesting TLS start.",'ok')
             session.start_feature(NS_TLS)
-            session.send(Node('starttls',{'xmlns':NS_TLS}))
+            session.sendnow(Node('starttls',{'xmlns':NS_TLS}))
         raise NodeProcessed
 
 import sha,base64,random,md5
@@ -162,11 +162,11 @@ class SASL(PlugIn):
             self.DEBUG('I can only use DIGEST-MD5 and PLAIN mecanisms.','error')
             return
         session.startsasl='in-process'
-        session.send(node)
+        session.sendnow(node)
         raise NodeProcessed
 """
     def commit_auth(self,session,authzid):
-        session.send(Node('success',{'xmlns':NS_SASL}))
+        session.sendnow(Node('success',{'xmlns':NS_SASL}))
         session.feature(NS_SASL)
         session.unfeature(NS_TLS)
         session.sasl['next']=[]
@@ -177,7 +177,7 @@ class SASL(PlugIn):
         self.DEBUG('Peer %s successfully authenticated'%authzid,'ok')
 
     def reject_auth(self,session,authzid='unknown'):
-        session.send(Node('failure',{'xmlns':NS_SASL},[Node('not-authorized')]))
+        session.sendnow(Node('failure',{'xmlns':NS_SASL},[Node('not-authorized')]))
         session.sasl['retries']=session.sasl['retries']-1
         if session.sasl['retries']<=0: session.terminate_stream()
         self.DEBUG('Peer %s failed to authenticate'%authzid,'error')
@@ -268,8 +268,8 @@ class SASL(PlugIn):
                     if key in ['nc','qop','response','charset']: sasl_data+="%s=%s,"%(key,resp[key])
                     else: sasl_data+='%s="%s",'%(key,resp[key])
                 node=Node('response',attrs={'xmlns':NS_SASL},payload=[base64.encodestring(sasl_data[:-1]).replace('\n','')])
-                self._owner.send(node)
-            elif chal.has_key('rspauth'): self._owner.send(Node('response',attrs={'xmlns':NS_SASL}))
+                self._owner.sendnow(node)
+            elif chal.has_key('rspauth'): self._owner.sendnow(Node('response',attrs={'xmlns':NS_SASL}))
 """
         elif stanza.getName()=='response':
             session.sasl['next']=['response','abort']
@@ -295,7 +295,7 @@ class Bind(PlugIn):
 
     def bindHandler(self,session,stanza):
         if session.xmlns<>NS_CLIENT or session.__dict__.has_key('resource'):
-            session.send(Error(stanza,ERR_SERVICE_UNAVAILABLE))
+            session.sendnow(Error(stanza,ERR_SERVICE_UNAVAILABLE))
         else:
             if session._session_state<SESSION_AUTHED:
                 session.terminate_stream(STREAM_NOT_AUTHORIZED)
@@ -309,7 +309,7 @@ class Bind(PlugIn):
             rep=stanza.buildReply('result')
             rep.T.bind.setNamespace(NS_BIND)
             rep.T.bind.T.jid=fulljid
-            session.send(rep)
+            session.sendnow(rep)
             session.set_session_state(SESSION_BOUND)
         raise NodeProcessed
 
@@ -325,8 +325,8 @@ class Session(PlugIn):
         if session.xmlns<>NS_CLIENT \
           or session._session_state<SESSION_BOUND \
           or self._owner.getsession(session.peer)==session:
-            session.send(Error(stanza,ERR_SERVICE_UNAVAILABLE))
+            session.sendnow(Error(stanza,ERR_SERVICE_UNAVAILABLE))
         else:
             session.set_session_state(SESSION_OPENED)
-            session.send(stanza.buildReply('result'))
+            session.sendnow(stanza.buildReply('result'))
         raise NodeProcessed
