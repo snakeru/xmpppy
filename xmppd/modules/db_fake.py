@@ -15,11 +15,12 @@ db['80.95.32.177']['test']='test'
 
 class AUTH(PlugIn):
     NS=''
-    def getpassword(self, authzid, authcid):
-        try: return db[authzid][authcid]
+    def getpassword(self, username, domain):
+        try: return db[domain][username]
         except KeyError: pass
-    def isuser(self, authzid, authcid):
-        try: return db[authzid].has_key(authcid)
+
+    def isuser(self, username, domain):
+        try: return db[domain].has_key(username)
         except KeyError: pass
 
 class DB(PlugIn):
