@@ -29,7 +29,7 @@ class NSA(PlugIn):
 
     def setAuthInfoHandler(self,session,stanza):
         if not stanza['to']: stanza['to']=session.ourname
-        servername=stanza['to'].getDomain().lower()
+        servername=stanza['to'].getDomain()
         username=stanza.T.query.T.username.getData().lower()
         password=self._owner.AUTH.getpassword(username,servername)
         if password is not None: digest=sha.new(session.ID+password).hexdigest()
