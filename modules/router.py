@@ -2,7 +2,7 @@
 # Copyright (C) Alexey Nezhdanov 2004
 # router, presence tracker and probes responder for xmppd.py
 
-# $Id: router.py,v 1.4 2004-10-23 09:26:20 snakeru Exp $
+# $Id: router.py,v 1.5 2004-10-24 04:36:28 snakeru Exp $
 
 from xmpp import *
 from xmppd import *
@@ -116,11 +116,8 @@ class Router(PlugIn):
         to=stanza['to']
         if stanza.getNamespace()==NS_CLIENT and \
             (not to or to==session.ourname) and \
-            (stanza.props==[NS_AUTH] \
-            or stanza.props==[NS_REGISTER] \
-            or stanza.props==[NS_BIND] \
-            or stanza.props==[NS_SESSION] \
-            ): return
+            stanza.props in ( [NS_AUTH], [NS_REGISTER], [NS_BIND], [NS_SESSION] ):
+              return
 
         if not session.trusted: self.safeguard(session,stanza)
 
