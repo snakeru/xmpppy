@@ -1,0 +1,50 @@
+The xmppd.py version 0.1 is POC software. It means that it cannot be used in
+production environment and published only for research purposes.
+It is surprisingly big: 40k agains awaited 15-20.
+
+xmppd.py is under development now. The goals of this development can be found
+here: http://www.saint-andre.com/blog/2004-08.html#2004-08-10T17:01
+
+Though this attempt leaves twisted project where it is - I've designed a good
+(IMHO) library and do not wants to let it be not used.
+
+The most bad thing about it is lack of documentation. Though I'm planning now 
+to take a several days rest from writing this server and hopefully will document 
+at least the dispatcher module - the most interesting place of the library.
+
+I'm asking all interested people to look into code and comment it 
+in jdev@jabber.org maillist. The server is made as modular as possible. 
+The core program is about handling sockets and opening XMPP streams only. 
+All real work is done in external modules that is plugged in semi-automatically.
+
+List of modules:
+
+xmppd.py - the server itself. As I already writed - it cares about sockets and 
+           streams headers.
+modules/__init__.py - consider this a config file. Here you can switch other 
+           parts ON or OFF.
+modules/config.py - config file reader. Package currently uses plaintext config
+           file. This is a quick solution that luckily can be easily replaced 
+           with 'normal' XML config file.
+modules/db_fake.py - dummy code. Though you should edit it to add users to 
+           server.
+modules/jep0078.py - Very quick writed code. Provides non-SASL auth to allow 
+           testing with existing clients. Works with Psi client.
+modules/router.py - Presence tracker/probes replyer/router. One of the two 
+           modules that is in good shape.
+modules/stream.py - TLS, SASL, Bind, Session. The second 'good' module.
+
+Server comes with two users registered:
+    'test' with password 'test'
+and
+    'test2' with password 'test'
+
+Some notes about processing incoming stanzas:
+ - if handler raises NodeProcessed exception this means that processing is done 
+   and server can handle the next stanza
+ - if handler just returns - it means that processing is not done yet and other 
+   handlers in queue should look at it
+ - finally stanza arrives (if NodeProcessed was not raised) at default handler 
+   and it returns the stanza back to the user.
+
+2004.09.23 Alexey Nezhdanov
