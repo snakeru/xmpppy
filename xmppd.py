@@ -14,7 +14,7 @@
 ##   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ##   GNU General Public License for more details.
 
-# $Id: xmppd.py,v 1.6 2004-10-08 19:06:41 snakeru Exp $
+# $Id: xmppd.py,v 1.7 2004-10-12 11:05:36 snakeru Exp $
 
 from xmpp import *
 if __name__=='__main__':
@@ -247,6 +247,7 @@ class Server:
         self.SESS_LOCK=thread.allocate_lock()
         for port in [5222,5223,5269]:
             sock=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             sock.bind(('', port+0))
             sock.listen(1)
             self.registersession(sock)
