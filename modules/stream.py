@@ -2,9 +2,10 @@
 # Copyright (C) Alexey Nezhdanov 2004
 # Stream-level features for xmppd.py
 
-# $Id: stream.py,v 1.4 2004-10-08 19:24:09 snakeru Exp $
+# $Id: stream.py,v 1.5 2004-10-15 13:14:04 snakeru Exp $
 
 from xmpp import *
+from xmppd import *
 import socket,thread
 from tlslite.api import *
 
@@ -37,22 +38,24 @@ class TLS(PlugIn):
             session.send(Node('failure',{'xmlns':NS_TLS}))
             self.DEBUG('TLS startup failure: can\'t find SSL cert/key file[s].','error')
             session.unfeature(NS_TLS)
-            raise NodeProcessed
-        session._owner.unregistersession(session)
-        thread.start_new_thread(self.startservertls,(session,))
+        else:
+            session.send(Node('proceed',{'xmlns':NS_TLS}))
+            self.startservertls(session)
         raise NodeProcessed
 
     def startservertls(self,session):
+        session._owner.unregistersession(session)
+        thread.start_new_thread(self._startservertls,(session,))
+
+    def _startservertls(self,session):
         try:
             cert=open(self._owner.sslcertfile).read()
             key=open(self._owner.sslkeyfile).read()
         except:
             session.unfeature(NS_TLS)
-            session.send(Node('failure',{'xmlns':NS_TLS}))
-            session._owner.registersession(session)
+            session.terminate_stream(STREAM_INTERNAL_SERVER_ERROR)
             return
 
-        session.send(Node('proceed',{'xmlns':NS_TLS}))
         x509 = X509()
         x509.parse(cert)
         certChain = X509CertChain([x509])
@@ -65,7 +68,7 @@ class TLS(PlugIn):
 
         session._sslObj = connection
         session._recv = connection.read
-        session._send = connection.write
+        session._send = connection.send
 
         session.feature(NS_TLS)
         session.StartStream()
@@ -79,7 +82,7 @@ class TLS(PlugIn):
         self.DEBUG('Starting client-mode TLS.','ok')
         try: session._sslObj = socket.ssl(session._sock, None, None)
         except:
-            session.set_socket_state('SOCKET_DEAD')
+            session.set_socket_state(SOCKET_DEAD)
             self.DEBUG('TLS failed. Terminating session','error')
             session.terminate_stream()
             raise NodeProcessed
@@ -163,15 +166,15 @@ class SASL(PlugIn):
         session.sasl['next']=[]
         session.StartStream()
         session.peer=authzid.lower()
-        if session.xmlns==NS_CLIENT: session.set_auth_state('SESSION_AUTHED')
-        else: session.set_auth_state('SESSION_BOUND')
-        self.DEBUG('Peer %s@%s successfully authenticated'%authzid,'ok')
+        if session.xmlns==NS_CLIENT: session.set_session_state(SESSION_AUTHED)
+        else: session.set_session_state(SESSION_BOUND)
+        self.DEBUG('Peer %s successfully authenticated'%authzid,'ok')
 
     def reject_auth(self,session,authzid='unknown'):
         session.send(Node('failure',{'xmlns':NS_SASL},[Node('not-authorized')]))
         session.sasl['retries']=session.sasl['retries']-1
         if session.sasl['retries']<=0: session.terminate_stream()
-        self.DEBUG('Peer %s@%s failed to authenticate'%authzid,'error')
+        self.DEBUG('Peer %s failed to authenticate'%authzid,'error')
 
     def SASLHandler(self,session,stanza):
         """simple username: servername _or_ node@servername : 6.1 (6)
@@ -194,7 +197,7 @@ class SASL(PlugIn):
         except:
             session.terminate_stream(STREAM_BAD_REQUEST)
             raise NodeProcessed
-        self.DEBUG('Got challenge:'+data,'ok')
+        self.DEBUG('Got challenge: '+`data`,'ok')
         for pair in data.split(','):
             if pair.find('=')==-1:
                 session.sasl['otherdata']=pair
@@ -223,9 +226,11 @@ class SASL(PlugIn):
                 if len(pack)<>3: res=0
                 else:
                     authzid, authcid, passwd = pack
-                    if not authzid: authzid=authcid
-                    username=authzid.split('@')[0]
-                    res = ( passwd == self._owner.AUTH.getpassword(username, authcid) )
+                    if not authzid:
+                        authzid=authcid
+                        if session.xmlns==NS_CLIENT: authzid+='@'+session.ourname
+                    username,domain=(authzid.split('@',1)+[''])[:2]
+                    res = ( passwd == self._owner.AUTH.getpassword(username, domain) )
                 if res: self.commit_auth(session,authzid)
                 else: self.reject_auth(session,authzid)
             elif mec=='DIGEST-MD5': pass
@@ -286,7 +291,7 @@ class Bind(PlugIn):
         if session.xmlns<>NS_CLIENT or session.__dict__.has_key('resource'):
             session.send(Error(stanza,ERR_SERVICE_UNAVAILABLE))
         else:
-            if session._auth_state<2:
+            if session._session_state<SESSION_AUTHED:
                 session.terminate_stream(STREAM_NOT_AUTHORIZED)
                 raise NodeProcessed
             resource=stanza.getTag('bind',namespace=NS_BIND).T.resource.getData()
@@ -299,7 +304,7 @@ class Bind(PlugIn):
             rep.T.bind.setNamespace(NS_BIND)
             rep.T.bind.T.jid=fulljid
             session.send(rep)
-            session.set_auth_state('SESSION_BOUND')
+            session.set_session_state(SESSION_BOUND)
         raise NodeProcessed
 
 class Session(PlugIn):
@@ -308,14 +313,14 @@ class Session(PlugIn):
         server.Dispatcher.RegisterHandler('iq',self.sessionHandler,typ='set',ns=NS_SESSION)
 
     def sessionHandler(self,session,stanza):
-        if session._auth_state<2:
+        if session._session_state<SESSION_AUTHED:
             session.terminate_stream(STREAM_NOT_AUTHORIZED)
             raise NodeProcessed
         if session.xmlns<>NS_CLIENT \
-          or session._auth_state<3 \
+          or session._session_state<SESSION_BOUND \
           or self._owner.getsession(session.peer)==session:
             session.send(Error(stanza,ERR_SERVICE_UNAVAILABLE))
         else:
-            session.set_auth_state('SESSION_OPENED')
+            session.set_session_state(SESSION_OPENED)
             session.send(stanza.buildReply('result'))
         raise NodeProcessed
