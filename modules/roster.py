@@ -1,10 +1,9 @@
 #!/usr/bin/python
 # Distributed under the terms of GPL version 2 or any later
 # Copyright (C) Alexey Nezhdanov 2004
-# roster implemetation for xmppd.py
-# made for mblsha
+# static roster implemetation for xmppd.py
 
-# $Id: roster.py,v 1.1 2004-10-25 11:55:29 snakeru Exp $
+# $Id: roster.py,v 1.2 2004-10-27 18:42:25 snakeru Exp $
 
 from xmpp import *
 from db_fake import db
@@ -19,18 +18,31 @@ class Roster(PlugIn):
         iq=stanza
         iq.setType('result')
         q=iq.T.query
+        to,frm=[],[]
         for server in db.keys():
             for user in db[server].keys():
                 item=q.NT.item
-                item.setAttr('jid','%s@%s'%(user,server))
-                item.setAttr('subscription','both')
-                item.setAttr('name',user)
-        sess.send(iq)
+                jid,sub,name='%s@%s'%(user,server),'both',user
+                item.setAttr('jid',jid)
+                item.setAttr('subscription',sub)
+                item.setAttr('name',name)
+                if sub in ['to','both']: to.append(jid)
+                if sub in ['from','both']: frm.append(jid)
+        sess.enqueue(iq)
         raise NodeProcessed
 
     def setRosterHandler(self,sess,stanza):
-        sess.send(Error(stanza,ERR_FEATURE_NOT_IMPLEMENTED))
+        sess.enqueue(Error(stanza,ERR_FEATURE_NOT_IMPLEMENTED))
         raise NodeProcessed
+
+    def getSubTo(self,session):
+        list=[]
+        for server in db.keys():
+            for user in db[server].keys():
+                jid=user+'@'+server
+                list.append(jid)
+        return list
+    getSubFrom=getSubTo
 
 class vCard(PlugIn):
     NS=NS_VCARD
@@ -40,5 +52,5 @@ class vCard(PlugIn):
 
     def dummyHandler(self,sess,stanza):
         iq=stanza.buildReply('result')
-        sess.send(iq)
+        sess.enqueue(iq)
         raise NodeProcessed
