@@ -19,7 +19,8 @@ class YahooCon:
     confpingojb = None
     session = 0
     host = 'cs1.msg.dcn.yahoo.com'
-    hostlist = ['cs1.msg.dcn.yahoo.com','cs2.msg.dcn.yahoo.com','cs3.msg.dcn.yahoo.com','cs4.msg.dcn.yahoo.com','cs5.msg.dcn.yahoo.com','cs6.msg.dcn.yahoo.com','cs7.msg.dcn.yahoo.com','cs8.msg.dcn.yahoo.com','cs9.msg.dcn.yahoo.com','cs10.msg.dcn.yahoo.com','cs11.msg.dcn.yahoo.com','cs12.msg.dcn.yahoo.com','cs13.msg.dcn.yahoo.com','cs14.msg.dcn.yahoo.com','cs15.msg.dcn.yahoo.com','cs16.msg.dcn.yahoo.com','cs17.msg.dcn.yahoo.com','cs18.msg.dcn.yahoo.com','cs40.msg.dcn.yahoo.com','cs41.msg.dcn.yahoo.com','cs42.msg.dcn.yahoo.com','cs43.msg.dcn.yahoo.com','cs44.msg.dcn.yahoo.com','cs45.msg.dcn.yahoo.com','cs46.msg.dcn.yahoo.com','cs50.msg.dcn.yahoo.com','cs51.msg.dcn.yahoo.com','cs52.msg.dcn.yahoo.com']
+    hostlist = socket.gethostbyname_ex('scs.msg.yahoo.com')[2]
+    #hostlist = ['cs1.msg.dcn.yahoo.com','cs2.msg.dcn.yahoo.com','cs3.msg.dcn.yahoo.com','cs4.msg.dcn.yahoo.com','cs5.msg.dcn.yahoo.com','cs6.msg.dcn.yahoo.com','cs7.msg.dcn.yahoo.com','cs8.msg.dcn.yahoo.com','cs9.msg.dcn.yahoo.com','cs10.msg.dcn.yahoo.com','cs11.msg.dcn.yahoo.com','cs12.msg.dcn.yahoo.com','cs13.msg.dcn.yahoo.com','cs14.msg.dcn.yahoo.com','cs15.msg.dcn.yahoo.com','cs16.msg.dcn.yahoo.com','cs17.msg.dcn.yahoo.com','cs18.msg.dcn.yahoo.com','cs40.msg.dcn.yahoo.com','cs41.msg.dcn.yahoo.com','cs42.msg.dcn.yahoo.com','cs43.msg.dcn.yahoo.com','cs44.msg.dcn.yahoo.com','cs45.msg.dcn.yahoo.com','cs46.msg.dcn.yahoo.com','cs50.msg.dcn.yahoo.com','cs51.msg.dcn.yahoo.com','cs52.msg.dcn.yahoo.com']
     port = 5050
     version = 0x000c0000
     sock = None
@@ -30,7 +31,7 @@ class YahooCon:
     handlers = {}
     # login -- on sucessful login
     # loginfail -- on login failure
-    
+
     def __init__(self, username, password, fromjid,fromhost):
         self.username = username
         self.password = password
@@ -39,7 +40,7 @@ class YahooCon:
         self.roster = {}
         self.buddylist = {}
         self.away = False
-        #variables for public MUC 
+        #variables for public MUC
         self.alias = username
         #Each room has a list of participants in the form of {username:(alias,state,statemsg)}
         self.roomlist = {}
@@ -52,7 +53,7 @@ class YahooCon:
         self.resources = {}
         self.xresources = {}
         self.offset = int(random.random()*len(self.hostlist))
-        
+
     # utility methods
     def connect(self):
         self.connok=False
@@ -69,18 +70,18 @@ class YahooCon:
                 self.conncount = self.conncount + 1
                 pass
         return None
-            
+
     def moreservers(self):
         if self.conncount < len(self.hostlist):
             print "more servers %s %s" % (len(self.hostlist),self.conncount)
             return True
         else:
             return False
-            
+
     def y_parsebuddies(self,txt):
         lines = txt.split('\n')
         #print lines
-        
+
         #print "Before: ",self.roster
         for each in lines:
             try:
@@ -93,7 +94,7 @@ class YahooCon:
             except ValueError:
                 pass
         #print "After: ", self.roster
-                
+
     # decoding handlers
     def ymsg_challenge(self,hdr,pay):
         # send authentication challenge responce
@@ -121,13 +122,13 @@ class YahooCon:
         #pay = ymsg_mkargu({109:self.username})
         #hdr = ymsg_mkhdr(self.version,len(pay),Y_ping,1,self.session)
         #return self.sock.send(hdr+pay)
-            
+
     def ymsg_online(self,hdr,pay):
         if pay[0].has_key(7):
             for each in pay:
                 status = None
                 if pay[0].has_key(10):
-                    if pay[0][10] == '99':                         
+                    if pay[0][10] == '99':
                         if pay[0].has_key(19):
                             status = unicode(pay[0][19],'utf-8','replace')
                 if pay[each].has_key(7):
@@ -165,8 +166,8 @@ class YahooCon:
                                     self.resources[pay[each][7]].append('messenger')
                             if self.handlers.has_key('online'):
                                 self.handlers['online'](self,pay[each][7])
-                    
-                                
+
+
     def ymsg_imvset(self,hdr,pay):
         if pay[0].has_key(7):
             for each in pay:
@@ -204,7 +205,7 @@ class YahooCon:
                         self.roster[pay[each][7]]=('unavailable', None, None)
         elif len(pay[0].keys()) == 0:
             self.handlers['loggedoff']()
-    
+
     def ymsg_notification(self,hdr,pay):
         if pay[0].has_key(20):
             url = pay[0][20]
@@ -215,7 +216,7 @@ class YahooCon:
         else:
             desc = None
         self.handlers['calendar'](self,url,desc)
-    
+
     def ymsg_email(self,hdr,pay):
         if pay[0].has_key(43):
             fromtxt = pay[0][43]
@@ -231,7 +232,7 @@ class YahooCon:
             subj = None
         if subj != None or fromaddr != None or fromtxt != None:
             self.handlers['email'](self,fromtxt,fromaddr,subj)
-    
+
     def ymsg_away(self,hdr,pay):
         if pay[0].has_key(10):
             if pay[0][10] == '1':
@@ -268,7 +269,7 @@ class YahooCon:
             if pay[0].has_key(7):
                 self.roster[pay[0][7]]=("available",typ,status)
                 self.handlers['online'](self,pay[0][7])
-                    
+
     def ymsg_back(self,hdr,pay):
         if pay[0].has_key(19):
             status = unicode(pay[0][19],'utf-8','replace')
@@ -283,8 +284,8 @@ class YahooCon:
         if pay[0].has_key(7):
             self.roster[pay[0][7]]=('available',typ,status)
             self.handlers['online'](self,pay[0][7])
-                    
-    
+
+
     def ymsg_roster(self,hdr,pay):
         if pay[0].has_key(3):
             if pay[0].has_key(14):
@@ -294,10 +295,10 @@ class YahooCon:
             if self.handlers.has_key('subscribe'):
                 self.handlers['subscribe'](self,pay[0][3],msg)
         self.ymsg_online(hdr,pay)
-    
+
     def ymsg_addbuddy(self,hdr,pay):
         pass
-    
+
     def ymsg_msg(self, hdr, pay):
         for each in pay.keys():
             if pay[each].has_key(14):
@@ -313,7 +314,7 @@ class YahooCon:
                         self.handlers['message'](self, pay[each][4], msg)
                 if hdr[3] == Y_confpm:
                     self.handlers['chatmessage'](self,pay[each][4], msg)
-                
+
     def ymsg_ping(self, hdr, pay):
         #print "got lib ping"
         self.secpingtime = 13
@@ -328,16 +329,16 @@ class YahooCon:
             self.pripingtime = None
         if self.handlers.has_key('ping'):
             self.handlers['ping'](self)
-                
+
     def ymsg_reqroom(self, hdr,pay):
         print "got reqroom"
         if self.handlers.has_key('reqroom'):
             self.handlers['reqroom'](self.fromjid)
-    
+
     def ymsg_conflogon(self,hdr,pay):
         if self.handlers['conflogon']:
             self.handlers['conflogon']()
-    
+
     def ymsg_joinroom(self,hdr,pay):
         # Do generic room information stuff
         room = None
@@ -369,7 +370,7 @@ class YahooCon:
                 a['location'] = each[142]
             if self.handlers.has_key('chatjoin') and room != None:
                 self.handlers['chatjoin'](self.fromjid,room,a)
-    
+
     def ymsg_leaveroom(self,hdr,pay):
         room = None
         if pay[0].has_key(104):
@@ -386,8 +387,8 @@ class YahooCon:
                 nick = yid
             if self.handlers.has_key('chatleave'):
                 self.handlers['chatleave'](self.fromjid,room,yid,nick)
-                
-                
+
+
     def ymsg_roommsg(self, hdr, pay):
         if pay[0].has_key(109):
             if pay[0].has_key(124):
@@ -401,41 +402,41 @@ class YahooCon:
                 self.handlers['roommessage'](self, pay[0][109], pay[0][104], msg)
             elif hdr[4] == 2:
                 self.handlers['roommessagefail'](self, pay[0][109], pay[0][104], msg)
-    
+
     def ymsg_init(self):
         try:
             return self.sock.send(self.ymsg_send_challenge())
         except:
             if self.handlers.has_key('loginfail'):
                 self.handlers['loginfail'](self)
-    
+
     def ymsg_send_init(self):
         return ymsg_mkhdr(self.version,0,Y_init,0,0)
-                
+
     def ymsg_send_challenge(self):
         pay = ymsg_mkargu({1:self.username})
         hdr = ymsg_mkhdr(self.version,len(pay),Y_chalreq,0,self.session)
         pkt = hdr + pay
         return pkt
-    
+
     def ymsg_send_addbuddy(self, nick, msg=''):
         if msg == None:
             msg = ''
         pay = ymsg_mkargu({1:self.username,7:nick,65:"jabber_yt",14:msg})
         hdr = ymsg_mkhdr(self.version, len(pay), Y_rosteradd,1,self.session)
         return hdr+pay
-    
+
     def ymsg_send_conflogon(self):
         print self.cookies
         pay = ymsg_mkargu({0:self.username,1:self.username,6: '%s; %s' % (self.cookies[0].replace('\t','=').split(';')[0],self.cookies[1].replace('\t','=').split(';')[0])})
         hdr = ymsg_mkhdr(self.version,len(pay),Y_confon,0x5a55aa55,self.session)
         return hdr+pay
-    
+
     def ymsg_send_conflogoff(self):
         pay = ymsg_mkargu({0:self.username,1:self.username})
         hdr = ymsg_mkhdr(self.version,len(pay),Y_confoff,0,self.session)
         return hdr+pay
-        
+
     def ymsg_send_chatlogin(self,alias):
         if alias == None:
             alias == self.username
@@ -448,23 +449,23 @@ class YahooCon:
         pay = ymsg_mkargu({1:self.username})
         hdr = ymsg_mkhdr(self.version, len(pay), Y_chatlogout, 0, self.session)
         return hdr+pay
-    
+
     def ymsg_send_chatjoin(self,room):
         self.roomlist[room]={'byyid':{},'bynick':{},'info':{}}
         pay = ymsg_mkargu({1:self.username, 62:'2',104:room})
         hdr = ymsg_mkhdr(self.version,len(pay), Y_joinroom,0,self.session)
         return hdr+pay
-        
+
     def ymsg_send_chatleave(self,room):
         pay = ymsg_mkargu({1:self.username,104:room})
         hdr = ymsg_mkhdr(self.version,len(pay), Y_leaveroom, 1, self.session)
         return hdr+pay
-        
+
     def ymsg_send_roommsg(self,room,msg, type = 0):
         pay = ymsg_mkargu({1:self.username,104:room,117:msg,124:type})
         hdr = ymsg_mkhdr(self.version,len(pay), Y_chtmsg,1,self.session)
         return hdr+pay
-    
+
     def ymsg_send_message(self, nick, msg):
         status = 0
         if self.roster.has_key(nick):
@@ -509,21 +510,21 @@ class YahooCon:
             hdr = ymsg_mkhdr(self.version,len(pay),Y_ping,1,self.session)
             self.pripingtime = time.time()
             return hdr+pay
-        
+
     def ymsg_send_secping(self):
         if time.time() - self.secpingtime > 10:
             pay = ''
             hdr = ymsg_mkhdr(self.version,len(pay),Y_ping2, 1, self.session)
             self.secpingtime = time.time()
             return hdr+pay
-    
+
     def ymsg_send_confping(self):
         if time.time() - self.confpingtime > 10:
             pay = ''
             hdr = ymsg_mkhdr(self.version,len(pay),Y_ping2, 1, self.session)
             self.confpingtime = time.time()
             return hdr+pay
-        
+
     def ymsg_send_delbuddy(self, nick, msg=''):
         if msg == None:
             msg = ''
@@ -534,7 +535,7 @@ class YahooCon:
         pay = ymsg_mkargu({1:self.username,7:nick,65:bgroup,14:msg})
         hdr = ymsg_mkhdr(self.version, len(pay), Y_rosterdel,0,self.session)
         return hdr+pay
-    
+
     def ymsg_send_online(self, show = None, message = None):
         d = {}
         if message != None:
@@ -555,7 +556,7 @@ class YahooCon:
         pay = ymsg_mkargu(d)
         hdr = ymsg_mkhdr(self.version,len(pay),Y_available,0,self.session)
         return hdr+pay
-    
+
     def ymsg_send_back(self,msg=None):
         argu = {10:'0'}
         if msg != None:
@@ -566,7 +567,7 @@ class YahooCon:
         pay = ymsg_mkargu(argu)
         hdr = ymsg_mkhdr(self.version,len(pay),Y_available,0,self.session)
         return hdr+pay
-    
+
     def ymsg_send_away(self,show = None, msg=None):
         if msg != None:
             a={10:'99',19:msg.encode('utf-8')}
@@ -580,7 +581,7 @@ class YahooCon:
             a[47] = '1'
         elif show == 'invisible':
             a[10]= '12'
-        print a 
+        print a
         pay = ymsg_mkargu(a)
         hdr = ymsg_mkhdr(self.version, len(pay), Y_away,0,self.session)
         return hdr+pay
@@ -620,6 +621,8 @@ class YahooCon:
             self.handlers['closed'](self)
         while len(self.rbuf) >= 20:
             s,u = ymsg_dehdr(self.rbuf)
+            if s[0] != 'YMSG':
+                self.handlers['closed']()
             size = 20+s[2]
             #print size, len(self.rbuf)
             if len(self.rbuf) >= size:
@@ -652,7 +655,7 @@ class YahooCon:
                     self.ymsg_ping(s,t)
                 elif s[3] == Y_ping:        #161
                     self.ymsg_ping(s,t)
-                elif s[3] == Y_rosteradd:     #131  
+                elif s[3] == Y_rosteradd:     #131
                     self.ymsg_addbuddy(s,t)
                 elif s[3] == Y_imvset:          #21
                     self.ymsg_imvset(s,t)
@@ -662,7 +665,7 @@ class YahooCon:
                     self.ymsg_away(s,t)
                 elif s[3] == Y_available:       #4
                     self.ymsg_back(s,t)
-                elif s[3] == Y_calendar:        
+                elif s[3] == Y_calendar:
                     self.ymsg_notification(s,t)
                 elif s[3] == Y_mail:            #11
                     self.ymsg_email(s,t)
@@ -682,7 +685,7 @@ class YahooCon:
                     pass
                 #print "remove packet"
                 self.rbuf = self.rbuf[size:]
-                    
+
             else:
                 break
 
@@ -691,10 +694,10 @@ if __name__ == '__main__':
     while not y.connect():
         print 'sleep'
         time.sleep(5)
-        
+
     print "connected ", y.sock
     y.sock.send(y.ymsg_send_challenge())
-    
+
     while 1:
         y.Process()
-            
+
