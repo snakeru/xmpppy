@@ -79,6 +79,7 @@ class Session:
             if feature in server.features: self.waiting_features.append(feature)
         self.features=[]
         self.feature_in_process=None
+        self.slave_session=None
         self.StartStream()
 
     def StartStream(self):
@@ -242,6 +243,8 @@ class Session:
             if isinstance(error,Node): self.send(error)
             else: self.send(ErrorNode(error))
         self._stream_close(unregister=unregister)
+        if self.slave_session:
+            self.slave_session.terminate_stream(STREAM_REMOTE_CONNECTION_FAILED)
 
     def _destroy_socket(self):
         """ breaking cyclic dependancy to let python's GC free memory just now """
@@ -388,8 +391,9 @@ class Server:
                 s.close()
             elif isinstance(s,Session): s.terminate_stream(reason)
 
-    def S2S(self,ourname,domain):
+    def S2S(self,ourname,domain,slave_session=None):
         s=Session(socket.socket(socket.AF_INET, socket.SOCK_STREAM),self,NS_SERVER,domain)
+        s.slave_session=slave_session
         s.ourname=ourname
         self.activatesession(s)
         thread.start_new_thread(self._connect_session,(s,domain))
@@ -404,7 +408,7 @@ class Server:
             elif err[0]==socket.EAI_NONAME: failreason=ERR_REMOTE_SERVER_NOT_FOUND
             else: failreason=ERR_UNDEFINED_CONDITION
             session.push_queue(failreason)
-            session.terminate_stream(unregister=0)
+            session.terminate_stream(STREAM_REMOTE_CONNECTION_FAILED,unregister=0)
             return
         session.set_socket_state(SOCKET_ALIVE)
         session.push_queue()
