@@ -37,7 +37,8 @@ class TLS(PlugIn):
         if not certfile or not keyfile:
             session.send(Node('failure',{'xmlns':NS_TLS}))
             self.DEBUG('TLS startup failure: can\'t find SSL cert/key file[s].','error')
-            session.unfeature(NS_TLS)
+            session.unfeature(NS_TLS)    # do not declare TLS anymore
+            session.stop_feature(NS_TLS) # TLS finished, let another features start
         else:
             session.send(Node('proceed',{'xmlns':NS_TLS}))
             self.startservertls(session)
@@ -70,7 +71,8 @@ class TLS(PlugIn):
         session._recv = connection.read
         session._send = connection.send
 
-        session.feature(NS_TLS)
+        session.feature(NS_TLS)      # TLS enabled, do not declare it anymore
+        session.stop_feature(NS_TLS) # TLS finished, let another features start
         session.StartStream()
         session._owner.registersession(session)
 
@@ -89,16 +91,19 @@ class TLS(PlugIn):
         session._recv = session._sslObj.read
         session._send = session._sslObj.write
 
-        session.feature(NS_TLS)
+        session.feature(NS_TLS)      # TLS enabled, do not declare it anymore
+        session.stop_feature(NS_TLS) # TLS finished, let another features start
         session.StartStream()
         raise NodeProcessed
 
     def FeaturesHandler(self,session,stanza):
         if NS_TLS in session.features: return     # already started. do nothing
+        if session.feature_in_process: return     # some other feature is already underway
         if not stanza.getTag('starttls',namespace=NS_TLS):
             self.DEBUG("TLS unsupported by remote server.",'warn')
         else:
             self.DEBUG("TLS supported by remote server. Requesting TLS start.",'ok')
+            session.start_feature(NS_TLS)
             session.send(Node('starttls',{'xmlns':NS_TLS}))
         raise NodeProcessed
 
@@ -138,6 +143,7 @@ class SASL(PlugIn):
             except NodeProcessed: pass
 
     def FeaturesHandler(self,session,feats):
+        if session.feature_in_process: return     # some other feature is already underway
         if not session.__dict__.has_key('username'): return
         if not feats.getTag('mechanisms',namespace=NS_SASL):
             session.unfeature(NS_SASL)
@@ -156,7 +162,7 @@ class SASL(PlugIn):
             self.DEBUG('I can only use DIGEST-MD5 and PLAIN mecanisms.','error')
             return
         session.startsasl='in-process'
-        session.send(node.__str__())
+        session.send(node)
         raise NodeProcessed
 """
     def commit_auth(self,session,authzid):
@@ -262,8 +268,8 @@ class SASL(PlugIn):
                     if key in ['nc','qop','response','charset']: sasl_data+="%s=%s,"%(key,resp[key])
                     else: sasl_data+='%s="%s",'%(key,resp[key])
                 node=Node('response',attrs={'xmlns':NS_SASL},payload=[base64.encodestring(sasl_data[:-1]).replace('\n','')])
-                self._owner.send(node.__str__())
-            elif chal.has_key('rspauth'): self._owner.send(Node('response',attrs={'xmlns':NS_SASL}).__str__())
+                self._owner.send(node)
+            elif chal.has_key('rspauth'): self._owner.send(Node('response',attrs={'xmlns':NS_SASL}))
 """
         elif stanza.getName()=='response':
             session.sasl['next']=['response','abort']
