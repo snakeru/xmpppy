@@ -2,7 +2,7 @@
 # Copyright (C) Alexey Nezhdanov 2004
 # JEP0078 (Non-SASL authenticaion) for xmppd.py
 
-# $Id: jep0078.py,v 1.5 2004-10-15 12:57:53 snakeru Exp $
+# $Id: jep0078.py,v 1.6 2004-10-23 09:22:44 snakeru Exp $
 
 from xmpp import *
 from xmppd import SESSION_OPENED
@@ -29,7 +29,7 @@ class NSA(PlugIn):
 
     def setAuthInfoHandler(self,session,stanza):
         if not stanza['to']: stanza['to']=session.ourname
-        servername=stanza['to'].getDomain().lower()
+        servername=stanza['to'].getDomain()
         username=stanza.T.query.T.username.getData().lower()
         password=self._owner.AUTH.getpassword(username,servername)
         if password is not None: digest=sha.new(session.ID+password).hexdigest()
