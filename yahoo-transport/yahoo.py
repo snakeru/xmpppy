@@ -854,7 +854,12 @@ class Transport:
             mjid = JID(yobj.fromjid)
             mjid.setResource(each)
             #print mjid, each
-            b = Presence(to = mjid, frm = '%s@%s/messenger'%(name, hostname),priority = 10, show=yobj.roster[name][1], status=cpformat.do(yobj.roster[name][2]))
+            if yobj.roster[name][2] != None:
+                status = cpformat.do(yobj.roster[name][2])
+            else:
+                status = None
+            print status
+            b = Presence(to = mjid, frm = '%s@%s/messenger'%(name, hostname),priority = 10, show=yobj.roster[name][1], status=status)
             if userfile[yobj.fromjid].has_key('avatar'):
                 print userfile[yobj.fromjid]['avatar'].keys(), name
                 if userfile[yobj.fromjid]['avatar'].has_key(name):
