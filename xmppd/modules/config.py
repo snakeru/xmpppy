@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # Distributed under the terms of GPL version 2 or any later
 # Copyright (C) Alexey Nezhdanov 2004
 # Configuration reader for xmppd.py
@@ -11,6 +10,7 @@ import ConfigParser
 cfgfile='xmppd.cfg'
 
 class Config(PlugIn):
+    NS=''
     def __init__(self):
         PlugIn.__init__(self)
         self.DBG_LINE='config'
