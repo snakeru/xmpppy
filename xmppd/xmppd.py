@@ -17,7 +17,7 @@
 # $Id$
 
 from xmpp import *
-import socket,select,random
+import socket,select,random,os,modules
 
 """
 _socket_state live/dead
@@ -47,11 +47,12 @@ class Session:
         self._owner=server
         self.ID=`random.random()`[2:]
         self.StartStream()
-        self._stream_state=STREAM_NOT_OPENED
+        self._socket_state=SOCKET_ALIVE
         self._auth_state=NOT_AUTHED
+        self.features=[]
 
     def StartStream(self):
-        self._socket_state=SOCKET_ALIVE
+        self._stream_state=STREAM_NOT_OPENED
         self.Stream=simplexml.NodeBuilder()
         self.Stream._dispatch_depth=2
         self.Stream.dispatch=self.dispatch
@@ -88,19 +89,32 @@ class Session:
     def fileno(self): return self._sock.fileno()
 
     def _stream_open(self,ns=None,tag='stream',attrs={}):
-        text='<?xml version="1.0" encoding="utf-8" ?>\n<stream:stream'
-        if attrs.has_key('to'): text+=" from='%s'"%attrs['to']
-        if attrs.has_key('xml:lang'): text+=" xml:lang='%s'"%attrs['xml:lang']
+        text='<?xml version="1.0" encoding="utf-8"?>\n<stream:stream'
+        if attrs.has_key('to'): text+=' from="%s"'%attrs['to']
+        if attrs.has_key('xml:lang'): text+=' xml:lang="%s"'%attrs['xml:lang']
         if self.Stream.xmlns in self.xmlns: xmlns=self.Stream.xmlns
         else: xmlns=self.xmlns[0]
-        text+=" xmlns:stream='http://etherx.jabber.org/streams' xmlns='%s' id='%s' version='1.0'"%(xmlns,self.ID)
+        text+=' xmlns:xmpp="%s" xmlns:stream="%s" xmlns="%s" id="%s" version="1.0"'%(NS_STANZAS,NS_STREAMS,xmlns,self.ID)
+        self.Stream.nsvoc={NS_STREAMS:'stream',NS_STANZAS:'xmpp'}
         self.send(text+'>')
         self.set_stream_state(STREAM_OPENED)
         if tag<>'stream': return self.terminate_stream(ERR_INVALID_XML)
-        if ns<>'http://etherx.jabber.org/streams': return self.terminate_stream(ERR_INVALID_NAMESPACE)
+        if ns<>NS_STREAMS: return self.terminate_stream(ERR_INVALID_NAMESPACE)
         if self.Stream.xmlns not in self.xmlns: return self.terminate_stream(ERR_BAD_NAMESPACE_PREFIX)
         if not attrs.has_key('to'): return self.terminate_stream(ERR_IMPROPER_ADDRESSING)
 #        if attrs['to'] not in our_hosts: return self.terminate_stream(ERR_HOST_UNKNOWN)
+        self.send_features()
+
+    def send_features(self):
+        features=Node('stream:features')
+        if 'tls' not in self.features and self._owner.__dict__.has_key('sslcertfile') and self._owner.__dict__.has_key('TLS'):
+            features.T.starttls.setNamespace(NS_TLS)
+            features.T.starttls.T.required
+        if 'sasl' not in self.features and self._owner.__dict__.has_key('SASL'):
+            features.T.mechanisms.setNamespace(NS_SASL)
+            features.T.mechanisms.T.mechanism='DIGEST-MD5'
+            features.T.mechanisms.NT.mechanism='PLAIN'
+        self.send(features)
 
     def _stream_close(self):
         if self._stream_state>=STREAM_CLOSED: return
@@ -114,13 +128,15 @@ class Session:
             self.set_stream_state(STREAM_CLOSING)
             self._stream_open()
         self.set_stream_state(STREAM_CLOSING)
-        if error: self.send(error)
+        if error: self.send(ErrorNode(error))
         self._stream_close()
 
     def _destroy_socket(self):
         """ workaround for bug in xml.parsers.expat. See http://bugs.debian.org/271619 """
-        self._sock.shutdown(2)
-        self._sock.close()
+        try:
+            self._sock.shutdown(2)
+            self._sock.close()
+        except: pass
         self.set_socket_state(SOCKET_DEAD)
 
     def set_socket_state(self,newstate):
@@ -152,10 +168,12 @@ class Server:
         self.dispatcher._owner=self
         self.dispatcher._init()
 
+        for addon in modules.addons: addon().PlugIn(self)
+
     def enqueue(self,session,stanza):
         if session._stream_state>=STREAM_CLOSED or session._socket_state>=SOCKET_DEAD: return
         if type(stanza)==type(u''): stanza = stanza.encode('utf-8')
-        elif type(stanza)<>type(''): stanza = ustr(stanza).encode('utf-8')
+        elif type(stanza)<>type(''): stanza = stanza.__str__(nsvoc=session.Stream.nsvoc).encode('utf-8')
         """ TODO: Here not send actually but enqueue. """
         try:
             session._send(stanza)
@@ -206,6 +224,9 @@ class Server:
             else: raise "Unknown socket type: %s"%sock.typ
 
     def run(self):
+        import psyco
+        psyco.log()
+        psyco.full()
         try:
             while 1:
               self.handle()
