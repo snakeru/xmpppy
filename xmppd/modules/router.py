@@ -116,11 +116,8 @@ class Router(PlugIn):
         to=stanza['to']
         if stanza.getNamespace()==NS_CLIENT and \
             (not to or to==session.ourname) and \
-            (stanza.props==[NS_AUTH] \
-            or stanza.props==[NS_REGISTER] \
-            or stanza.props==[NS_BIND] \
-            or stanza.props==[NS_SESSION] \
-            ): return
+            stanza.props in ( [NS_AUTH], [NS_REGISTER], [NS_BIND], [NS_SESSION] ):
+              return
 
         if not session.trusted: self.safeguard(session,stanza)
 
