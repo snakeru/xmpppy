@@ -2,7 +2,7 @@
 # Copyright (C) Alexey Nezhdanov 2004
 # router, presence tracker and probes responder for xmppd.py
 
-# $Id: router.py,v 1.3 2004-10-15 13:09:45 snakeru Exp $
+# $Id: router.py,v 1.4 2004-10-23 09:26:20 snakeru Exp $
 
 from xmpp import *
 from xmppd import *
@@ -23,7 +23,7 @@ class Router(PlugIn):
 #        2) any user
         to=stanza['to']
         if  to and (
-            to.getDomain().lower() not in self._owner.servernames or
+            to.getDomain() not in self._owner.servernames or
             to.getNode() ):
                 return
 
@@ -57,14 +57,14 @@ class Router(PlugIn):
         elif typ=='probe':
             try:
                 resources=[stanza.getTo().getResource()]
-                if not resources[0]: resources=self._data[barejid]
+                if not resources[0]: resources=self._data[barejid].keys()
                 flag=1
                 for resource in resources:
                     p=Presence(to=stanza.getFrom(),frm=session.peer,node=self._data[barejid][resource])
                     if flag:
-                        self._owner.Privacy(session.peer,bp)
+                        self._owner.Privacy(session.peer,p)
                         flag=None
-                    session.enqueue(bp)
+                    session.enqueue(p)
             except KeyError: session.enqueue(Presence(to=stanza.getFrom(),frm=jid,typ='unavailable'))
         else: return
         raise NodeProcessed
@@ -79,11 +79,14 @@ class Router(PlugIn):
         else: self._owner.deactivatesession(barejid)
 
     def safeguard(self,session,stanza):
-        if session._session_state<SESSION_BOUND: # NOT BOUND yet (stream's stuff already done)
+        if stanza.getNamespace() not in [NS_CLIENT,NS_SERVER]: return # this is not XMPP stanza
+
+        if session._session_state<SESSION_AUTHED: # NOT AUTHED yet (stream's stuff already done)
             session.terminate_stream(STREAM_NOT_AUTHORIZED)
             raise NodeProcessed
 
         frm=stanza['from']
+        to=stanza['to']
         if stanza.getNamespace()==NS_SERVER:
             if not frm or not to \
               or frm.getDomain()<>session.peer \
@@ -111,7 +114,8 @@ class Router(PlugIn):
         self.DEBUG('Router handler called','info')
 
         to=stanza['to']
-        if (not to or to==session.ourname) and \
+        if stanza.getNamespace()==NS_CLIENT and \
+            (not to or to==session.ourname) and \
             (stanza.props==[NS_AUTH] \
             or stanza.props==[NS_REGISTER] \
             or stanza.props==[NS_BIND] \
@@ -121,11 +125,11 @@ class Router(PlugIn):
         if not session.trusted: self.safeguard(session,stanza)
 
         if not to: return # stanza.setTo(session.ourname)
-        domain=to.getDomain().lower()
+        domain=to.getDomain()
 
         getsession=self._owner.getsession
         if domain in self._owner.servernames:
-            node=to.getNode().lower()
+            node=to.getNode()
             if not node: return
             self._owner.Privacy(session.peer,stanza) # it will raise NodeProcessed if needed
             bareto=node+'@'+domain
@@ -218,7 +222,7 @@ class Router(PlugIn):
 #          MUST reply with a <service-unavailable/> stanza error.
                 return
         else:
-            s=getsession(to)
+            s=getsession(domain)
             if not s:
                 s=self._owner.S2S(session.ourname,domain)
             s.enqueue(stanza)
