@@ -15,6 +15,7 @@ class YahooCon:
     rbuf = ''
     pripingobj = None
     secpingobj = None
+    confpingojb = None
     session = 0
     host = 'cs1.msg.dcn.yahoo.com'
     hostlist = ['cs17.msg.dcn.yahoo.com','cs18.msg.dcn.yahoo.com','cs40.msg.dcn.yahoo.com','cs41.msg.dcn.yahoo.com','cs42.msg.dcn.yahoo.com','cs43.msg.dcn.yahoo.com','cs44.msg.dcn.yahoo.com','cs45.msg.dcn.yahoo.com','cs46.msg.dcn.yahoo.com','cs50.msg.sc5.yahoo.com','cs51.msg.sc5.yahoo.com','cs52.msg.sc5.yahoo.com']
@@ -289,25 +290,26 @@ class YahooCon:
                 msg = ''
             if self.handlers.has_key('subscribe'):
                 self.handlers['subscribe'](self,pay[0][3],msg)
-            self.ymsg_online(hdr,pay)
+        self.ymsg_online(hdr,pay)
     
     def ymsg_addbuddy(self,hdr,pay):
         pass
     
     def ymsg_msg(self, hdr, pay):
-        if pay[0].has_key(14):
-            if pay[0].has_key(124):
-                if pay[0][124]=='2':
-                    msg = '/me '+pay[0][14]
-            else:
-                msg = pay[0][14]
-            if hdr[3] == Y_msg:
-                if hdr[4] == 2:
-                    self.handlers['messagefail'](self, pay[0][4], msg)
+        for each in pay.keys():
+            if pay[each].has_key(14):
+                if pay[each].has_key(124):
+                    if pay[each][124]=='2':
+                        msg = '/me '+pay[each][14]
                 else:
-                    self.handlers['message'](self, pay[0][4], msg)
-            if hdr[3] == Y_confpm:
-                self.handlers['chatmessage'](self,pay[0][4], msg)
+                    msg = pay[each][14]
+                if hdr[3] == Y_msg:
+                    if hdr[4] == 2:
+                        self.handlers['messagefail'](self, pay[each][4], msg)
+                    else:
+                        self.handlers['message'](self, pay[each][4], msg)
+                if hdr[3] == Y_confpm:
+                    self.handlers['chatmessage'](self,pay[each][4], msg)
                 
     def ymsg_ping(self, hdr, pay):
         #print "got lib ping"
@@ -505,6 +507,13 @@ class YahooCon:
             hdr = ymsg_mkhdr(self.version,len(pay),Y_ping2, 1, self.session)
             self.secpingtime = time.time()
             return hdr+pay
+    
+    def ymsg_send_confping(self):
+        if time.time() - self.confpingtime > 10:
+            pay = ''
+            hdr = ymsg_mkhdr(self.version,len(pay),Y_ping2, 1, self.session)
+            self.confpingtime = time.time()
+            return hdr+pay
         
     def ymsg_send_delbuddy(self, nick, msg=''):
         if msg == None:
@@ -616,9 +625,11 @@ class YahooCon:
                     self.ymsg_imvset(s,t)
                 elif s[3] == Y_away:            #3
                     self.ymsg_away(s,t)
+                elif s[3] == Y_statusupdate: #198
+                    self.ymsg_away(s,t)
                 elif s[3] == Y_available:       #4
                     self.ymsg_back(s,t)
-                elif s[3] == Y_calendar:        #15
+                elif s[3] == Y_calendar:        
                     self.ymsg_notification(s,t)
                 elif s[3] == Y_mail:            #11
                     self.ymsg_email(s,t)
@@ -643,7 +654,7 @@ class YahooCon:
                 break
 
 if __name__ == '__main__':
-    y = YahooCon('mikea21020','Jasmine','mikea@jabber.org.uk')
+    y = YahooCon('YID','password','jid')
     while not y.connect():
         print 'sleep'
         time.sleep(5)
