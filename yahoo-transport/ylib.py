@@ -123,13 +123,13 @@ class YahooCon:
         #return self.sock.send(hdr+pay)
             
     def ymsg_online(self,hdr,pay):
-        status = None
-        if pay[0].has_key(10):
-            if pay[0][10] == '99':
-                if pay[0].has_key(19):
-                    status = unicode(pay[0][19],'utf-8','replace')
         if pay[0].has_key(7):
             for each in pay:
+                status = None
+                if pay[0].has_key(10):
+                    if pay[0][10] == '99':                         
+                        if pay[0].has_key(19):
+                            status = unicode(pay[0][19],'utf-8','replace')
                 if pay[each].has_key(7):
                     typ = None
                     if pay[each].has_key(47):
