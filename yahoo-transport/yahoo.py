@@ -287,7 +287,12 @@ class Transport:
                             userlist[fromstripped].away= 'invisible'
                     else:
                         # open connection case
-                        conf = userfile[fromstripped]
+                        try:
+                            conf = userfile[fromstripped]
+                        except:
+                            self.jabberqueue(Message(to=fromstripped,subject='Transport Configuration Error',body='The transport has found that your configuration could not be loaded. Please re-register with the transport'))
+                            del userfile[fromstripped]
+                            return
                         yobj = ylib.YahooCon(conf['username'].encode('utf-8'),conf['password'].encode('utf-8'), fromstripped,localaddress)
                         #userlist[fromstripped]=yobj
                         s = yobj.connect()
@@ -326,34 +331,37 @@ class Transport:
                         self.jabberqueue(Presence(to=fromjid,frm = hostname, typ='unavailable'))
             elif event.getTo().getDomain() == chathostname:
                 if userlist.has_key(fromstripped):
-                    print "chat presence"
-                    try:
-                        #print event.getTo().getNode().encode('utf-8').decode('base64')
-                        room = unicode(event.getTo().getNode().encode('utf-8').decode('hex'),'utf-8','strict')
-    
-                    except:
-                        if userlist[fromstripped].roomnames.has_key(event.getTo().getNode()):
-                            room = userlist[fromstripped].roomnames[event.getTo().getNode()]
+                    if userlist[fromstripped].connok:
+                        print "chat presence"
+                        try:
+                            #print event.getTo().getNode().encode('utf-8').decode('base64')
+                            room = unicode(event.getTo().getNode().encode('utf-8').decode('hex'),'utf-8','strict')
+        
+                        except:
+                            if userlist[fromstripped].roomnames.has_key(event.getTo().getNode()):
+                                room = userlist[fromstripped].roomnames[event.getTo().getNode()]
+                            else:
+                                self.jabberqueue(Error(event,ERR_NOT_ACCEPTABLE))
+                                print "decode error"
+                                return
+                        userlist[fromstripped].roomnames[event.getTo().getNode().lower()] = room
+                        if event.getType() == 'available' or event.getType() == None or event.getType() == '':
+                            nick = event.getTo().getResource()
+                            userlist[fromstripped].nick = nick
+                            if not userlist[fromstripped].chatlogin:
+                                self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_conflogon())
+                                self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_chatlogin(None))
+                                userlist[fromstripped].roomtojoin = room.encode('utf-8')
+                            else:
+                                self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_chatjoin(room.encode('utf-8')))
+                        elif event.getType() == 'unavailable':
+                            self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_chatleave(room.encode('utf-8')))
+                            self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_chatlogout())
+                            self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_conflogoff())
                         else:
-                            self.jabberqueue(Error(event,ERR_NOT_ACCEPTABLE))
-                            print "decode error"
-                            return
-                    userlist[fromstripped].roomnames[event.getTo().getNode().lower()] = room
-                    if event.getType() == 'available' or event.getType() == None or event.getType() == '':
-                        nick = event.getTo().getResource()
-                        userlist[fromstripped].nick = nick
-                        if not userlist[fromstripped].chatlogin:
-                            self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_conflogon())
-                            self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_chatlogin(None))
-                            userlist[fromstripped].roomtojoin = room.encode('utf-8')
-                        else:
-                            self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_chatjoin(room.encode('utf-8')))
-                    elif event.getType() == 'unavailable':
-                        self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_chatleave(room.encode('utf-8')))
-                        self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_chatlogout())
-                        self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_conflogoff())
+                            self.jabberqueue(Error(event,ERR_FEATURE_NOT_IMPLEMENTED))
                     else:
-                        self.jabberqueue(Error(event,ERR_FEATURE_NOT_IMPLEMENTED))
+                        self.jabberqueue(Error(event,ERR_BAD_REQUEST))
                 else:
                     self.jabberqueue(Error(event,ERR_BAD_REQUEST))
         else:
@@ -380,8 +388,9 @@ class Transport:
                     p = [Node('identity',attrs={'category':'client','type':'yahoo','name':to.getNode()})]
                     #Individual feature code goes here
                     #Avatar (old style)
-                    if userfile[fromjid.getStripped()]['avatar'].has_key(to.getNode()):
-                        p.append(Node('feature', attrs={'var':'jabber:iq:avatar'}))
+                    if userfile[fromjid.getStripped()].has_key('avatar'):
+                        if userfile[fromjid.getStripped()]['avatar'].has_key(to.getNode()):
+                            p.append(Node('feature', attrs={'var':'jabber:iq:avatar'}))
                     
                     m.setQueryPayload(p)
                     m.setID(id)
@@ -548,8 +557,11 @@ class Transport:
             password = []
             fromjid = event.getFrom().getStripped().encode('utf8')
             if userfile.has_key(fromjid):
-                username = userfile[fromjid]['username']
-                password = userfile[fromjid]['password']
+                try:
+                    username = userfile[fromjid]['username']
+                    password = userfile[fromjid]['password']
+                except:
+                    pass
             m = event.buildReply('result')
             m.setQueryNS(NS_REGISTER)
             m.setQueryPayload([Node('instructions', payload = 'Please provide your Yahoo! username and password'),Node('username',payload=username),Node('password',payload=password)])
@@ -662,8 +674,11 @@ class Transport:
                 timerlist.remove(yobj.pripingobj)
             if yobj.secpingobj in timerlist:
                 timerlist.remove(yobj.secpingobj)
-            if yobj.confpingobj in timerlist:
-                timerlist.remove(yobj.confpingobj)
+            try:
+                if yobj.confpingobj in timerlist:
+                    timerlist.remove(yobj.confpingobj)
+            except AttributeError:
+                pass
             del userlist[yobj.fromjid]
             del rdsocketlist[yobj.sock]
             if wrsocketlist.has_key(yobj.sock):
