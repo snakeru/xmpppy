@@ -796,7 +796,7 @@ class Transport:
             conf = userfile[yobj.fromjid]
             conf['username']=yobj.username
             userfile[yobj.fromjid]=conf
-            self.jabberqueue(Presence(to=yobj.fromjid,frm=hostname,subject='Yahoo! login name',body='Your Yahoo! username was specified incorrectly in the configuration. This may be because of an upgrade from a previous version, the configuration has been updated'))
+            self.jabberqueue(Message(to=yobj.fromjid,frm=hostname,subject='Yahoo! login name',body='Your Yahoo! username was specified incorrectly in the configuration. This may be because of an upgrade from a previous version, the configuration has been updated'))
     
     def y_login(self,yobj):
         print "got login"
@@ -854,7 +854,7 @@ class Transport:
             mjid = JID(yobj.fromjid)
             mjid.setResource(each)
             #print mjid, each
-            b = Presence(to = mjid, frm = '%s@%s/messenger'%(name, hostname),priority = 10, show=yobj.roster[name][1], status=yobj.roster[name][2])
+            b = Presence(to = mjid, frm = '%s@%s/messenger'%(name, hostname),priority = 10, show=yobj.roster[name][1], status=cpformat.do(yobj.roster[name][2]))
             if userfile[yobj.fromjid].has_key('avatar'):
                 print userfile[yobj.fromjid]['avatar'].keys(), name
                 if userfile[yobj.fromjid]['avatar'].has_key(name):
