@@ -3,14 +3,14 @@
 # Copyright (C) Alexey Nezhdanov 2004
 # In-band-registration for xmppd.py
 
-# $Id: jep0077.py,v 1.1 2004-09-17 19:53:01 snakeru Exp $
+# $Id: jep0077.py,v 1.2 2004-09-19 20:20:05 snakeru Exp $
 
 from xmpp import *
 
 class IBR(PlugIn):
     def plugin(self,server):
-        server.dispatcher.RegisterHandler('iq',self.getRegInfoHandler,'get',NS_REGISTER)
-        server.dispatcher.RegisterHandler('iq',self.setRegInfoHandler,'set',NS_REGISTER)
+        server.Dispatcher.RegisterHandler('iq',self.getRegInfoHandler,'get',NS_REGISTER)
+        server.Dispatcher.RegisterHandler('iq',self.setRegInfoHandler,'set',NS_REGISTER)
 
     def getRegInfoHandler(self,sess,stanza):
         name=stanza['to']

@@ -1,23 +1,16 @@
 #!/usr/bin/python
 # Distributed under the terms of GPL version 2 or any later
 # Copyright (C) Alexey Nezhdanov 2004
-# Session manager for xmppd.py
+# JEP0078 (Non-SASL authenticaion) for xmppd.py
 
-# $Id: jep0078.py,v 1.1 2004-09-17 19:53:01 snakeru Exp $
-
-"""
-According to jabberd2 man page, 
-[session manager] provides instant messaging services to Jabber clients.
-It performs all the essential instant messaging services like rosters, presence
-tracking, message distribution and subscriptions, plus more advanced features.
-"""
+# $Id: jep0078.py,v 1.2 2004-09-19 20:20:05 snakeru Exp $
 
 from xmpp import *
 
 class NSA(PlugIn):
     def plugin(self,server):
-        server.dispatcher.RegisterHandler('iq',self.getAuthInfoHandler,'get',NS_AUTH)
-        server.dispatcher.RegisterHandler('iq',self.setAuthInfoHandler,'set',NS_AUTH)
+        server.Dispatcher.RegisterHandler('iq',self.getAuthInfoHandler,'get',NS_AUTH)
+        server.Dispatcher.RegisterHandler('iq',self.setAuthInfoHandler,'set',NS_AUTH)
 
     def getAuthInfoHandler(self,sess,stanza):
         name=stanza['to']

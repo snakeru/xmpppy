@@ -1,7 +1,8 @@
-# $Id: __init__.py,v 1.1 2004-09-17 19:53:01 snakeru Exp $
+# $Id: __init__.py,v 1.2 2004-09-19 20:20:05 snakeru Exp $
 
 import os
-#import sm,config,jep0077,c2s,jep0078
+from psyco.classes import *
+
 for m in os.listdir('modules'):
     if m[:2]=='__' or m[-3:]<>'.py': continue
     exec "import "+m[:-3]
@@ -16,9 +17,9 @@ jabberd2 consists mainly of:
 addons = [
     config.Config,
     stream.TLS,
-#    stream.SASL,
-#    c2s.C2S,
-#    sm.SM,
+    db_fake.AUTH,
+    stream.SASL,
+    stream.Bind,
     jep0077.IBR,
     jep0078.NSA,
     ]
