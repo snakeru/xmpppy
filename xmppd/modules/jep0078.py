@@ -5,6 +5,7 @@
 # $Id$
 
 from xmpp import *
+from xmppd import SESSION_OPENED
 import sha
 
 class NSA(PlugIn):
@@ -27,24 +28,24 @@ class NSA(PlugIn):
         raise NodeProcessed
 
     def setAuthInfoHandler(self,session,stanza):
+        if not stanza['to']: stanza['to']=session.ourname
         servername=stanza['to'].getDomain().lower()
         username=stanza.T.query.T.username.getData().lower()
         password=self._owner.AUTH.getpassword(username,servername)
         if password is not None: digest=sha.new(session.ID+password).hexdigest()
         if servername not in self._owner.servernames:
-            iq=Error(stanza,ERR_ITEM_NOT_FOUND)
+            session.send(Error(stanza,ERR_ITEM_NOT_FOUND))
         elif session.ourname==servername \
           and password \
           and (stanza.T.query.T.password.getData()==password \
            or stanza.T.query.T.digest.getData()==digest ) \
           and stanza.T.query.T.resource.getData():
-            iq=stanza.buildReply('result')
+            session.send(stanza.buildReply('result'))
             fulljid="%s@%s/%s"%(username,servername,stanza.T.query.T.resource.getData())
             session.peer=fulljid
             s=self._owner.deactivatesession(fulljid)
             if s: s.terminate_stream(STREAM_CONFLICT)
-            session.set_auth_state('SESSION_OPENED')
+            session.set_session_state(SESSION_OPENED)
         else:
-            iq=stanza.buildReply('error')
-        session.send(iq)
+            session.send(stanza.buildReply('error'))
         raise NodeProcessed
