@@ -5,7 +5,7 @@ from curphoo import YahooMD5
 from yahoo_helpers import *
 import socket, time
 import avatar
-
+import re
 
 
 
@@ -251,7 +251,7 @@ class YahooCon:
                 status = "Stepped Out"
             elif pay[0][10] == '99':
                 if pay[0].has_key(19):
-                    status = unicode(pay[0][19],'utf-8','replace')
+                    status = re.sub('\x05','',unicode(pay[0][19],'utf-8','replace'))
                 else:
                     status = None
             else:
@@ -518,6 +518,7 @@ class YahooCon:
     def ymsg_send_delbuddy(self, nick, msg=''):
         if msg == None:
             msg = ''
+        bgroup = 'jabber_yt'
         for group in self.buddylist.keys():
             if nick in self.buddylist[group]:
                 bgroup = group
