@@ -23,6 +23,8 @@ addons = [
     stream.Session,
     router.Router,
 #    privacy.Privacy,
+    roster.Roster,
+    roster.vCard,
 
 # JEPs
 #    jep0077.IBR,
