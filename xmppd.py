@@ -14,7 +14,7 @@
 ##   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ##   GNU General Public License for more details.
 
-Revision="$Id: xmppd.py,v 1.10 2004-10-24 04:37:19 snakeru Exp $"[5:41].replace(',v',' Rev:')
+Revision="$Id: xmppd.py,v 1.11 2004-10-25 10:54:23 snakeru Exp $"[5:41].replace(',v',' Rev:')
 
 from xmpp import *
 if __name__=='__main__':
@@ -109,7 +109,7 @@ class Session:
         return received
 
     def send(self,chunk):
-        if isinstance(chunk,Node): chunk = str(chunk).encode('utf-8')
+        if isinstance(chunk,Node): chunk = chunk.__str__().encode('utf-8')
         elif type(chunk)==type(u''): chunk = chunk.encode('utf-8')
         self.enqueue(chunk)
 
