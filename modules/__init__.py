@@ -1,4 +1,4 @@
-# $Id: __init__.py,v 1.3 2004-10-03 17:46:25 snakeru Exp $
+# $Id: __init__.py,v 1.4 2004-10-23 08:58:45 snakeru Exp $
 
 import os
 #from psyco.classes import *
@@ -16,12 +16,13 @@ addons = [
 # XMPP-Core
     stream.TLS,
     stream.SASL,
+    dialback.Dialback,
 
 # XMPP-IM
     stream.Bind,
     stream.Session,
-#    privacy.Privacy,
     router.Router,
+#    privacy.Privacy,
 
 # JEPs
 #    jep0077.IBR,
