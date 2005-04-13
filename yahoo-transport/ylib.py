@@ -626,7 +626,11 @@ class YahooCon:
             size = 20+s[2]
             #print size, len(self.rbuf)
             if len(self.rbuf) >= size:
-                t = ymsg_deargu(u[:s[2]])
+            	try:
+                	t = ymsg_deargu(u[:s[2]])
+                except:
+                	print "Broken connection Terminating"
+                	self.handlers['closed']()
                 print s, t, len(self.rbuf)
                 if s[3] == Y_chalreq:           #87
                     # give salt
