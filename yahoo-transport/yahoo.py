@@ -229,8 +229,8 @@ class Transport:
                             features = []
                             if discoresults.has_key(event.getFrom().getStripped().encode('utf8')):
                                 discoresult = discoresults[event.getFrom().getStripped().encode('utf8')]
-                                for i in discoresult.getQueryPayload():
-                                    if i.getName() == 'feature': features.append(i.getAttr('var'))
+                                #for i in discoresult.getQueryPayload():
+                                if discoresult.getTag('query').getTag('feature'): features.append(discoresult.getTag('query').getAttr('var'))
                             #Part 2, make the rosterX message
                             if NS_ROSTERX in features:
                                 m = Message(to = fromjid, frm = hostname, subject= 'Yahoo Roster Items', body = 'Items from Yahoo Roster')
@@ -502,6 +502,7 @@ class Transport:
                     print 'catagory item case ',self.chatcat[0][1]
                     if self.chatcat[0][1].has_key(event.getQuerynode()):
                         m = Iq(to=fromjid,frm=to,typ='result',queryNS=NS_DISCO_INFO, payload=[Node('identity',attrs={'name':self.chatcat[0][1][event.getQuerynode()]})])
+                        m.setQuerynode(event.getQuerynode())
                         m.setID(id)
                         self.jabberqueue(m)
                         raise dispatcher.NodeProcessed
@@ -618,7 +619,7 @@ class Transport:
                                 if each.has_key('rooms'):
                                     for c in each['rooms'].keys():
                                         n = ('%s:%s' % (each['name'],c)).encode('hex')
-                                        payload.append(Node('item',attrs={'jid':'%s@%s'%(n,chathostname),'node':event.getQuerynode(),'name':'%s:%s'%(each['name'],c)}))
+                                        payload.append(Node('item',attrs={'jid':'%s@%s'%(n,chathostname),'name':'%s:%s'%(each['name'],c)}))
                                         #print payload
                 m = event.buildReply('result')
                 m.setQueryNS(NS_DISCO_ITEMS)
@@ -676,11 +677,12 @@ class Transport:
             #        print "Have password ", password
             #    elif each.getName() == 'remove':
             #        remove = True
-            if event.getQueryPayload().getTag('username'):
-            	username = event.getQueryPayload().getTagData('username')
-            if event.getQueryPayload().getTag('password'):
-            	password = event.getQueryPayload().getTagData('password')
-            if event.getQueryPayload().getTag('remove'):
+            query = event.getTag('query')
+            if query.getTag('username'):
+            	username = query.getTagData('username')
+            if query.getTag('password'):
+            	password = query.getTagData('password')
+            if query.getTag('remove'):
            	remove = True
             if not remove and username and password:
                 if userfile.has_key(fromjid):
@@ -1112,12 +1114,12 @@ if __name__ == '__main__':
             try:
                 if rdsocketlist[each] == 'xmpp':
                     connection.Process(1)
-                    if not connection.isConnected():  transport.xmpp_disconnect()
+                    if not connection.isConnected():  trans.xmpp_disconnect()
                 else:
                    try:
                       rdsocketlist[each].Process()
                    except socket.error:
-                      transport.y_closed(rdsocketlist[each])
+                      trans.y_closed(rdsocketlist[each])
             except KeyError:
                 pass
         for each in o:
