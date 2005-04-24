@@ -1,6 +1,7 @@
 import httplib
+import re
 from xmpp import simplexml
-
+from xml.parsers.expat import *
 YAHOORL="insider.msg.yahoo.com"
 
 def getcata(cata):
@@ -38,6 +39,8 @@ def getcata(cata):
         return None
 
 def getrooms(cat):
+    #if cat == '0' or cat == 0:
+    #   return None
     conn = httplib.HTTPConnection(YAHOORL)
     try:
         conn.request("GET","/ycontent/?chatroom_%s"%(cat))
@@ -49,8 +52,12 @@ def getrooms(cat):
         return None
     #print r1.status, r1.reason
     data1 = unicode(r1.read(),'utf-8','replace')
-    #print data1
-    rooms = simplexml.XML2Node(data1)
+    data1 = re.sub('&#xd[8-9a-f]..;','',data1)
+    try:
+       rooms = simplexml.XML2Node('<?xml version="1.0" encoding="UTF-8" ?>'+data1)
+    except:
+       open('badxml.xml','w').write('<?xml version="1.0" encoding="UTF-8" ?>'+data1)
+       raise
     r = rooms.getChildren()[0].getChildren()
     l = {}
     for each in r:
@@ -68,10 +75,12 @@ def getrooms(cat):
                     if b.has_key('webcams'):
                         p[b['count']]['webcams']=b['webcams']
             a['rooms']=p
-            print a
+            #print a
             l[a['name']]=a
     return l
 
 if __name__ == "__main__":
     #print getcata(0)
-    print getrooms(1600083763)
+    print getrooms(1600073831)
+    #print getrooms(0)
+    
