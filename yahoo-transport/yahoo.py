@@ -180,6 +180,7 @@ class Transport:
                         #print 'resource error'
                         self.jabberqueue(Error(event,ERR_BAD_REQUEST))
                 elif event.getTo().getDomain() == chathostname:
+                    # Must add resource matching here, ie only connected resource can send to room.
                     if event.getSubject():
                         self.jabberqueue(Error(event,ERR_NOT_IMPLEMENTED))
                         return
@@ -388,6 +389,7 @@ class Transport:
                             if not userlist[fromstripped].chatlogin:
                                 self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_conflogon())
                                 self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_chatlogin(None))
+                                userlist[fromstripped].chatresource = event.getFrom().getResource()
                                 #Add secondary ping object code
                                 freq = 5 * 60 #Secondary ping frequency from Zinc
                                 offset = int(time.time())%freq
@@ -398,6 +400,7 @@ class Transport:
                             else:
                                 self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_chatjoin(room.encode('utf-8')))
                         elif event.getType() == 'unavailable':
+                            # Must add code to compare from resources here
                             self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_chatleave(room.encode('utf-8')))
                             self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_chatlogout())
                             self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_conflogoff())
@@ -919,11 +922,13 @@ class Transport:
 
     def y_roommessage(self,yobj,yid,room,msg):
         txt = cpformat.do(msg)
+        to = JID(yobj.fromjid)
+        to.setResource(yobj.chatresource)
         if yobj.roomlist[room]['byyid'].has_key(yid):
             nick = yobj.roomlist[room]['byyid'][yid]['nick']
         else:
             nick = yid
-        self.jabberqueue(Message(typ = 'groupchat', frm = '%s@%s/%s' % (room.encode('hex'),chathostname,nick),to=yobj.fromjid,body=txt))
+        self.jabberqueue(Message(typ = 'groupchat', frm = '%s@%s/%s' % (room.encode('hex'),chathostname,nick),to=to,body=txt))
 
     def y_calendar(self,yobj,url,desc):
         m = Message(to=yobj.fromjid,typ='headline', subject = "Yahoo Calendar Event", body = desc)
@@ -1007,10 +1012,12 @@ class Transport:
                     info['nick'] = info['yip']
                 #print info['yip'],userlist[fromjid].username
                 if info['yip'] == userlist[fromjid].username:
-                    jid = fromjid
+                    #jid = fromjid
                     print info['nick'], userlist[fromjid].nick
                     if info['nick'] != userlist[fromjid].nick:
-                        p = Presence(frm = '%s@%s/%s' % (room.encode('hex'),chathostname,userlist[fromjid].nick), typ='unavailable')
+                    	jid = JID(fromjid)
+                    	jid.setResource(userlist[fromjid].chatresource)
+                        p = Presence(to = jid, frm = '%s@%s/%s' % (room.encode('hex'),chathostname,userlist[fromjid].nick), typ='unavailable')
                         p.addChild(node=MucUser(jid = jid, nick = info['nick'], role = 'participant', affiliation = 'none', status = 303))
                         self.jabberqueue(p)
                 else:
@@ -1026,7 +1033,9 @@ class Transport:
             if userlist[fromjid].roomlist[room]['byyid'].has_key(yid):
                 del userlist[fromjid].roomlist[room]['bynick'][userlist[fromjid].roomlist[room]['byyid'][yid]['nick']]
                 del userlist[fromjid].roomlist[room]['byyid'][yid]
-                self.jabberqueue(Presence(frm = '%s@%s/%s' % (room.encode('hex'),chathostname,nick), to= fromjid, typ = 'unavailable'))
+                jid = JID(fromjid)
+                jid.setResource(userlist[fromjid].chatresource)
+                self.jabberqueue(Presence(frm = '%s@%s/%s' % (room.encode('hex'),chathostname,nick), to= jid, typ = 'unavailable'))
 
     def xmpp_iq_browse(self, con, event):
         m = Iq(to = event.getFrom(), frm = event.getTo(), typ = 'result', queryNS = NS_BROWSE)
@@ -1134,6 +1143,8 @@ if __name__ == '__main__':
                     del wrsocketlist[each]
             except KeyError:
                 pass
+            except socket.error:
+            	trans.y_closed(rdsocketlist[each])
         #delayed execution method modified from python-irclib written by Joel Rosdahl <joel@rosdahl.net>
         for each in timerlist:
             #print int(time.time())%each[0]-each[1]
