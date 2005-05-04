@@ -46,6 +46,7 @@ class YahooCon:
         self.roomlist = {}
         self.roomnames = {} #Dictionary entry for *NAUGHTY* clients that lowercase the JID
         self.chatlogin = False
+        self.chatresource = None
         #login junk
         self.connok = False
         self.conncount = 0
@@ -685,6 +686,8 @@ class YahooCon:
                     self.ymsg_roommsg(s,t)
                 elif s[3] == Y_init:            #76
                     self.ymsg_init()
+                elif s[3] == Y_chatlogout:
+                    self.chatlogin = False
                 else:
                     pass
                 #print "remove packet"
