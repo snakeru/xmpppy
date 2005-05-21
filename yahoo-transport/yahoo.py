@@ -341,7 +341,7 @@ class Transport:
                             #Add line into currently matched resources
                             yobj.xresources[event.getFrom().getResource()]=(event.getShow(),event.getPriority(),event.getStatus(),time.time())
                         else:
-                            self.jabberqueue(Error(event,ERR_REMOTE_CONNECTION_FAILED))
+                            self.jabberqueue(Error(event,ERR_REMOTE_SERVER_TIMEOUT))
                 elif event.getType() == 'unavailable':
                     # Match resources and remove the newly unavailable one
                     if userlist.has_key(fromstripped):
@@ -682,11 +682,11 @@ class Transport:
             #        remove = True
             query = event.getTag('query')
             if query.getTag('username'):
-            	username = query.getTagData('username')
+                username = query.getTagData('username')
             if query.getTag('password'):
-            	password = query.getTagData('password')
+                password = query.getTagData('password')
             if query.getTag('remove'):
-           	remove = True
+               remove = True
             if not remove and username and password:
                 if userfile.has_key(fromjid):
                     conf = userfile[fromjid]
@@ -778,7 +778,7 @@ class Transport:
                 else:
                     self.y_loginfail(yobj)
             self.jabberqueue(Presence(to = yobj.fromjid, frm = hostname, typ='unavailable'))
-            self.jabberqueue(Error(Presence(frm = yobj.fromjid, to = hostname),ERR_REMOTE_CONNECTION_FAILED))
+            self.jabberqueue(Error(Presence(frm = yobj.fromjid, to = hostname),ERR_REMOTE_SERVER_TIMEOUT))
             if yobj.pripingobj in timerlist:
                 timerlist.remove(yobj.pripingobj)
             if yobj.secpingobj in timerlist:
@@ -1015,8 +1015,8 @@ class Transport:
                     #jid = fromjid
                     print info['nick'], userlist[fromjid].nick
                     if info['nick'] != userlist[fromjid].nick:
-                    	jid = JID(fromjid)
-                    	jid.setResource(userlist[fromjid].chatresource)
+                        jid = JID(fromjid)
+                        jid.setResource(userlist[fromjid].chatresource)
                         p = Presence(to = jid, frm = '%s@%s/%s' % (room.encode('hex'),chathostname,userlist[fromjid].nick), typ='unavailable')
                         p.addChild(node=MucUser(jid = jid, nick = info['nick'], role = 'participant', affiliation = 'none', status = 303))
                         self.jabberqueue(p)
@@ -1144,7 +1144,7 @@ if __name__ == '__main__':
             except KeyError:
                 pass
             except socket.error:
-            	trans.y_closed(rdsocketlist[each])
+                trans.y_closed(rdsocketlist[each])
         #delayed execution method modified from python-irclib written by Joel Rosdahl <joel@rosdahl.net>
         for each in timerlist:
             #print int(time.time())%each[0]-each[1]
