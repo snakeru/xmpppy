@@ -473,7 +473,7 @@ class Transport:
             m = Iq(to=fromjid,frm=to, typ='result', queryNS=NS_DISCO_INFO, payload=[Node('identity',attrs={'category':'gateway','type':'yahoo','name':VERSTR}),Node('feature',attrs={'var':NS_REGISTER}),Node('feature',attrs={'var':NS_VERSION})])
             m.setID(id)
             self.jabberqueue(m)
-            raise dispatcher.NodeProcessed
+            #raise dispatcher.NodeProcessed
         elif event.getTo().getDomain() == hostname:
             if userlist.has_key(fromjid.getStripped()):
                 #print userlist[fromjid.getStripped()].roster
@@ -500,7 +500,7 @@ class Transport:
                     m = Iq(to=fromjid,frm=to,typ='result',queryNS=NS_DISCO_INFO, payload=[Node('identity',attrs={'category':'conference','type':'yahoo','name':'Yahoo public chat rooms'}),Node('feature',attrs={'var':NS_MUC})])
                     m.setID(id)
                     self.jabberqueue(m)
-                    raise dispatcher.NodeProcessed
+                    #raise dispatcher.NodeProcessed
                 else:
                     print 'catagory item case ',self.chatcat[0][1]
                     if self.chatcat[0][1].has_key(event.getQuerynode()):
@@ -508,7 +508,7 @@ class Transport:
                         m.setQuerynode(event.getQuerynode())
                         m.setID(id)
                         self.jabberqueue(m)
-                        raise dispatcher.NodeProcessed
+                        #raise dispatcher.NodeProcessed
             else:
                 print 'item case', event.getQuerynode()
                 try:
@@ -537,7 +537,7 @@ class Transport:
                 except:
                     #pass
                     self.jabberqueue(Error(event,ERR_NOT_ACCEPTABLE))
-                raise dispatcher.NodeProcessed
+        raise dispatcher.NodeProcessed
 
     def xmpp_iq_discoinfo_results(self, con, event):
         discoresults[event.getFrom().getStripped().encode('utf8')]=event
@@ -555,7 +555,7 @@ class Transport:
             m.setQueryPayload(b)
             m.setID(id)
             self.jabberqueue(m)
-            raise dispatcher.NodeProcessed
+            #raise dispatcher.NodeProcessed
         elif event.getTo().getDomain() == hostname:
             if userlist.has_key(fromjid.getStripped()):
                 #print userlist[fromjid.getStripped()].roster
@@ -581,7 +581,7 @@ class Transport:
                 m = Iq(to=fromjid,frm=to, typ='result',queryNS=NS_DISCO_ITEMS,payload=payload)
                 m.setID(id)
                 self.jabberqueue(m)
-                raise dispatcher.NodeProcessed
+                #raise dispatcher.NodeProcessed
             else:
                 # Do get room item
                 if not self.catlist.has_key(event.getQuerynode()):
@@ -629,14 +629,14 @@ class Transport:
                 m.setQuerynode(event.getQuerynode())
                 m.setQueryPayload(payload)
                 self.jabberqueue(m)
-                raise dispatcher.NodeProcessed
+                #raise dispatcher.NodeProcessed
         elif event.getTo().getDomain() == chathostname:
             m = event.buildReply('result')
             m.setQueryNS(NS_DISCO_ITEMS)
             self.jabberqueue(m)
         else:
             self.jabberqueue(Error(event,ERR_FEATURE_NOT_IMPLEMENTED))
-            raise dispatcher.NodeProcessed
+        raise dispatcher.NodeProcessed
 
     def xmpp_iq_agents(self, con, event):
         m = Iq(to=event.getFrom(), frm=event.getTo(), typ='result', payload=[Node('agent', attrs={'jid':hostname},payload=[Node('service',payload='yahoo'),Node('name',payload=VERSTR),Node('groupchat')])])
