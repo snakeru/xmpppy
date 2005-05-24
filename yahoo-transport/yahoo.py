@@ -26,6 +26,11 @@ discoresults = {}
 
 # colour parsing re: re.sub('\x1b\[([0-9]+)])m','<asci colour=\\1>',string)
 
+def stripformatting(text):
+    text = re.sub('\x0b','',text)
+    return cpformat.do(text)
+   
+
 def connectxmpp(handler_reg_func):
     #global connection
     #connection = client.Component(hostname,port)
@@ -876,7 +881,7 @@ class Transport:
             mjid.setResource(each)
             #print mjid, each
             if yobj.roster[name][2] != None:
-                status = cpformat.do(yobj.roster[name][2])
+                status = stripformatting(yobj.roster[name][2])
             else:
                 status = None
             print status
@@ -912,16 +917,16 @@ class Transport:
         self.jabberqueue(Presence(typ='subscribe',frm = '%s@%s' % (nick, hostname), to=yobj.fromjid,payload=msg))
 
     def y_message(self,yobj,nick,msg):
-        self.jabberqueue(Message(typ='chat',frm = '%s@%s/messenger' %(nick,hostname), to=yobj.fromjid,body=cpformat.do(msg)))
+        self.jabberqueue(Message(typ='chat',frm = '%s@%s/messenger' %(nick,hostname), to=yobj.fromjid,body=stripformatting(msg)))
 
     def y_messagefail(self,yobj,nick,msg):
         self.jabberqueue(Error(Message(typ='chat',to = '%s@%s' %(nick,hostname), frm=yobj.fromjid,body=msg),ERR_SERVICE_UNAVAILABLE))
 
     def y_chatmessage(self,yobj,nick,msg):
-        self.jabberqueue(Message(typ='chat',frm = '%s@%s/chat' %(nick,hostname), to=yobj.fromjid,body=cpformat.do(msg)))
+        self.jabberqueue(Message(typ='chat',frm = '%s@%s/chat' %(nick,hostname), to=yobj.fromjid,body=stripformatting(msg)))
 
     def y_roommessage(self,yobj,yid,room,msg):
-        txt = cpformat.do(msg)
+        txt = stripformatting(msg)
         to = JID(yobj.fromjid)
         to.setResource(yobj.chatresource)
         if yobj.roomlist[room]['byyid'].has_key(yid):
@@ -938,12 +943,12 @@ class Transport:
 
     def y_email(self,yobj, fromtxt, fromaddr, subj):
         if fromtxt != None:
-            bfrom = cpformat.do(fromtxt)
+            bfrom = stripformatting(fromtxt)
         else:
             bfrom = ''
         if fromaddr != None:
-            bfrom = bfrom + ' < ' + cpformat.do(fromaddr) + ' > '
-        m = Message(to=yobj.fromjid,typ='headline', subject = "Yahoo Email Event", body = 'From: %s\nSubject: %s'% (unicode(bfrom,'utf-8','replace'),unicode(cpformat.do(subj),'utf-8','replace')))
+            bfrom = bfrom + ' < ' + stripformatting(fromaddr) + ' > '
+        m = Message(to=yobj.fromjid,typ='headline', subject = "Yahoo Email Event", body = 'From: %s\nSubject: %s'% (unicode(bfrom,'utf-8','replace'),unicode(stripformatting(subj),'utf-8','replace')))
         self.jabberqueue(m)
 
     def y_reg_login(self,yobj):
