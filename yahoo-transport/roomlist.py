@@ -52,7 +52,7 @@ def getrooms(cat):
         return None
     #print r1.status, r1.reason
     data1 = unicode(r1.read(),'utf-8','replace')
-    data1 = re.sub('&#xd[8-9a-f]..;','',data1)
+    data1 = re.sub('&#x(d[8-9a-f]..)|(1.);','',data1)
     try:
        rooms = simplexml.XML2Node('<?xml version="1.0" encoding="UTF-8" ?>'+data1)
     except:
