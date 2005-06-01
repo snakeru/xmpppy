@@ -546,6 +546,7 @@ class Transport:
 
     def xmpp_iq_discoinfo_results(self, con, event):
         discoresults[event.getFrom().getStripped().encode('utf8')]=event
+        raise dispatcher.NodeProcessed
 
     def xmpp_iq_discoitems(self, con, event):
         fromjid = event.getFrom()
@@ -669,6 +670,7 @@ class Transport:
             self.jabberqueue(i)
         else:
             self.jabberqueue(Error(event,ERR_BAD_REQUEST))
+       	raise dispatcher.NodeProcessed
 
     def xmpp_iq_register_set(self, con, event):
         if event.getTo() == hostname:
@@ -738,6 +740,7 @@ class Transport:
                 self.jabberqueue(Error(event,ERR_BAD_REQUEST))
         else:
             self.jabberqueue(Error(event,ERR_BAD_REQUEST))
+	raise dispatcher.NodeProcessed
 
     def xmpp_iq_avatar(self, con, event):
         fromjid = event.getFrom()
@@ -754,6 +757,7 @@ class Transport:
                 self.jabberqueue(Error(event,ERR_NOT_FOUND))
         else:
             self.jabberqueue(Error(event,ERR_NOT_FOUND))
+      	raise dispatcher.NodeProcessed
 
     def y_avatar(self,fromjid,yid,avatar):
         if avatar != None:
