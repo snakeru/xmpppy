@@ -1,7 +1,6 @@
 import httplib
 import re
-from xmpp import simplexml
-from xml.parsers.expat import *
+import htmlutils
 YAHOORL="insider.msg.yahoo.com"
 
 def getcata(cata):
@@ -18,7 +17,7 @@ def getcata(cata):
     if r1.status == 200:
         data1 = unicode(r1.read(),'utf-8','replace')
         #print data1
-        t = simplexml.XML2Node(data1)
+        t = htmlutils.XHTML2Node(data1)
         try:
             cata = t.getChildren()[0].getChildren()
             l = {0:{}}
@@ -54,7 +53,7 @@ def getrooms(cat):
     data1 = unicode(r1.read(),'utf-8','replace')
     data1 = re.sub('&#x(d[8-9a-f]..)|(1.);','',data1)
     try:
-       rooms = simplexml.XML2Node('<?xml version="1.0" encoding="UTF-8" ?>'+data1)
+       rooms = htmlutils.XHTML2Node('<?xml version="1.0" encoding="UTF-8" ?>'+data1)
     except:
        open('badxml.xml','w').write('<?xml version="1.0" encoding="UTF-8" ?>'+data1)
        raise
@@ -81,6 +80,6 @@ def getrooms(cat):
 
 if __name__ == "__main__":
     #print getcata(0)
-    print getrooms(1600073831)
+    print getrooms(1600043463)
     #print getrooms(0)
     
