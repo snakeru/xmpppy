@@ -1,7 +1,20 @@
 import httplib
-import re
+import re, socket
 import htmlutils
 YAHOORL="insider.msg.yahoo.com"
+
+def decode_hextoutf8(match):
+    	""" This function decodes the hex string into a utf8 return value, or returns '' """
+    	#print 'Hex decoder',
+    	a = match.group(0)[3:len(match.group(0))-1]
+    	if len(a) %2:
+    		a = '0'+a
+    	try:
+    		val = unicode('utf8',a.decode('hex'))
+    	except:
+    		val = ''
+    	#print val
+    	return val
 
 def getcata(cata):
     conn = httplib.HTTPConnection(YAHOORL)
@@ -51,7 +64,8 @@ def getrooms(cat):
         return None
     #print r1.status, r1.reason
     data1 = unicode(r1.read(),'utf-8','replace')
-    data1 = re.sub('&#x(d[8-9a-f]..)|(1.);','',data1)
+    data1 = re.sub('&#x(d[8-9a-f]..;)|(1.;)','',data1)
+    data1 = re.sub('&#x([0-9a-f]*;)',decode_hextoutf8,data1)
     try:
        rooms = htmlutils.XHTML2Node('<?xml version="1.0" encoding="UTF-8" ?>'+data1)
     except:
