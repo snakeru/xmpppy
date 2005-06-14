@@ -30,7 +30,10 @@ def getcata(cata):
     if r1.status == 200:
         data1 = unicode(r1.read(),'utf-8','replace')
         #print data1
+        try:
         t = htmlutils.XHTML2Node(data1)
+        except:
+            return None
         try:
             cata = t.getChildren()[0].getChildren()
             l = {0:{}}
