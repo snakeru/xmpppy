@@ -274,7 +274,7 @@ class Transport:
                         else:
                             #add new user case.
                             if event.getStatus() != None:
-                                print event.getStatus()
+                                print event.getStatus().encode('utf-8')
                                 status = event.getStatus().encode('utf-8')
                             else:
                                 status = ''
@@ -313,7 +313,7 @@ class Transport:
                             print "New resource login: %s" % userlist[fromstripped].xresources
                             #send roster as is
                             self.y_send_online(fromstripped,event.getFrom().getResource())
-                        print fromstripped, event.getShow(), event.getStatus()
+                        print fromstripped, event.getShow().encode('utf-8'), event.getStatus().encode('utf-8')
                         self.xmpp_presence_do_update(event,fromstripped)
                     else:
                         # open connection case
@@ -515,14 +515,14 @@ class Transport:
                         self.jabberqueue(m)
                         #raise dispatcher.NodeProcessed
             else:
-                print 'item case', event.getQuerynode()
+                print 'item case', event.getQuerynode().encode('utf-8')
                 try:
                     str = unicode(event.getTo().getNode().encode('utf-8').decode('hex'),'utf-8','strict')
-                    print str
+                    print str.encode('utf-8')
                     info = None
                     if self.catlist.has_key(event.getQuerynode()):
                         lobby,room = str.split(':')
-                        print event.getQuerynode(), lobby, room
+                        print event.getQuerynode().encode('utf-8'), lobby, room
                         if self.catlist[event.getQuerynode()][1].has_key(lobby):
                             t = self.catlist[event.getQuerynode()][1][lobby]
                             print t
@@ -601,7 +601,7 @@ class Transport:
                         if t != None:
                             self.catlist[event.getQuerynode()] = (time.time(),t)
                 # Do get more categories
-                print event.getQuerynode()
+                print event.getQuerynode().encode('utf-8')
                 if not self.chatcat.has_key(event.getQuerynode()):
                     t = roomlist.getcata(event.getQuerynode())
                     #print t
