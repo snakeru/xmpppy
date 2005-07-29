@@ -86,8 +86,11 @@ class Transport:
                     self.y_closed(userlist[each])
         badlist = []
         for each in wrsocketlist.keys():
-            if each.fileno() == -1:
-                badlist.append(each)
+            try:
+            	if each.fileno() == -1:
+                    badlist.append(each)
+            except:
+            	    badlist.append(each)
         for each in badlist:
             del wrsocketlist[each]
         return
@@ -313,7 +316,7 @@ class Transport:
                             print "New resource login: %s" % userlist[fromstripped].xresources
                             #send roster as is
                             self.y_send_online(fromstripped,event.getFrom().getResource())
-                        print fromstripped, event.getShow().encode('utf-8'), event.getStatus().encode('utf-8')
+                        #print fromstripped, event.getShow().encode('utf-8'), event.getStatus().encode('utf-8')
                         self.xmpp_presence_do_update(event,fromstripped)
                     else:
                         # open connection case
@@ -515,7 +518,7 @@ class Transport:
                         self.jabberqueue(m)
                         #raise dispatcher.NodeProcessed
             else:
-                print 'item case', event.getQuerynode().encode('utf-8')
+                #print 'item case', event.getQuerynode().encode('utf-8')
                 try:
                     str = unicode(event.getTo().getNode().encode('utf-8').decode('hex'),'utf-8','strict')
                     print str.encode('utf-8')
@@ -1103,6 +1106,9 @@ if __name__ == '__main__':
             (i , o, e) = select.select(rdsocketlist.keys(),wrsocketlist.keys(),[],1)
         except ValueError:
             print "Value Error", rdsocketlist, wrsocketlist
+            trans.findbadconn()
+        except socket.error:
+            print "Bad Socket", rdsocketlist, wrsocketlist
             trans.findbadconn()
 ##            for each in rdsocketlist.keys():
 ##                try:
