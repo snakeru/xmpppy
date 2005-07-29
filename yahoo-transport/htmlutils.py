@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
 from xmpp.simplexml import Node,T,NT,ustr, XMLescape
-import HTMLParser
+from HTMLParser import HTMLParser
+import re
 
 ENCODING='utf8'
 DBG_NODEBUILDER = 'nodebuilder'
-class NodeBuilder:
+class NodeBuilder(HTMLParser):
     """ Builds a Node class minidom from data parsed to it. This class used for two purposes:
         1. Creation an XML Node from a textual representation. F.e. reading a config file. See an XML2Node method.
         2. Handling an incoming XML stream. This is done by mangling 
@@ -19,14 +20,14 @@ class NodeBuilder:
             "data" (if provided) feeded to parser immidiatedly after instance init.
             """
         self.DEBUG(DBG_NODEBUILDER, "Preparing to handle incoming XML stream.", 'start')
-        self._parser = HTMLParser.HTMLParser()
-        self._parser.handle_starttag       = self.starttag
-        self._parser.handle_endtag         = self.endtag
-        self._parser.handle_data      = self.handle_data
-        self._parser.handle_charref = self.handle_charref
+        #self._parser = HTMLParser.HTMLParser()
+        #self._parser.handle_starttag       = self.starttag
+        #self._parser.handle_endtag         = self.endtag
+        #self._parser.handle_data      = self.handle_data
+        #self._parser.handle_charref = self.handle_charref
         #self._parser.StartNamespaceDeclHandler = self.handle_namespace_start
-        self.Parse = self._parser.feed
-
+        #self.Parse = self._parser.feed
+	HTMLParser.__init__(self)
         self.__depth = 0
         self._dispatch_depth = 1
         self._document_attrs = None
@@ -37,8 +38,8 @@ class NodeBuilder:
         self.xmlns="http://www.w3.org/XML/1998/namespace"
 
         if data: 
-        	self._parser.feed(data)
-        	self._parser.close()
+        	self.feed(data)
+        	self.close()
 
     def destroy(self):
         """ Method used to allow class instance to be garbage-collected. """
@@ -47,7 +48,7 @@ class NodeBuilder:
         self._parser.CharacterDataHandler      = None
         self._parser.StartNamespaceDeclHandler = None
 
-    def starttag(self, tag, attr):
+    def handle_starttag(self, tag, attr):
         """XML Parser callback. Used internally"""
         attrs={}
         #attlist=attrs.keys()       #
@@ -75,7 +76,7 @@ class NodeBuilder:
         if not self.last_is_data and self._ptr.parent: self._ptr.parent.data.append('')
         self.last_is_data = 0
 
-    def endtag(self, tag ):
+    def handle_endtag(self, tag ):
         """XML Parser callback. Used internally"""
         self.DEBUG(DBG_NODEBUILDER, "DEPTH -> %i , tag -> %s" % (self.__depth, tag), 'up')
         if self.__depth == self._dispatch_depth:
@@ -90,6 +91,8 @@ class NodeBuilder:
 
     def handle_data(self, data):
         """XML Parser callback. Used internally"""
+        print data.strip(),
+        data = re.sub('&#x([0-9a-f]*;)',self.decode_hextoutf8,data)
         self.DEBUG(DBG_NODEBUILDER, data, 'data')
         if not self._ptr: return
         if self.last_is_data:
@@ -98,8 +101,8 @@ class NodeBuilder:
             self._ptr.data.append(data)
             self.last_is_data = 1
 
-    def handle_charref(self,data):
-    	print "Got chardata: ", data
+    def handle_charref(self,name):
+    	print "Got chardata: ", name
 
     def handle_namespace_start(self, prefix, uri):
         """XML Parser callback. Used internally"""
@@ -117,6 +120,18 @@ class NodeBuilder:
         """ Method called when stream just opened. """
     def stream_footer_received(self):
         """ Method called when stream just closed. """
+
+    def decode_hextoutf8(self,match):
+    	""" This function decodes the hex string into a utf8 return value, or returns '' """
+    	print 'Hex decoder'
+    	a = match.group(0)[3:len(match.group(0))-1]
+    	if len(a) %2:
+    		a = '0'+a
+    	try:
+    		return unicode('utf8',a.decode('hex'))
+    	except:
+    		return ''
+    	
 
 def XHTML2Node(xml):
 	return NodeBuilder(xml).getDom()
