@@ -490,8 +490,8 @@ class Transport:
                     p = [Node('identity',attrs={'category':'client','type':'yahoo','name':to.getNode()})]
                     #Individual feature code goes here
                     #Avatar (old style)
-                    if userfile[fromjid.getStripped()].has_key('avatar'):
-                        if userfile[fromjid.getStripped()]['avatar'].has_key(to.getNode()):
+                    if userfile[fromjid.getStripped().encode('utf8')].has_key('avatar'):
+                        if userfile[fromjid.getStripped().encode('utf8')]['avatar'].has_key(to.getNode()):
                             p.append(Node('feature', attrs={'var':'jabber:iq:avatar'}))
                     m.setQueryPayload(p)
                     m.setID(id)
