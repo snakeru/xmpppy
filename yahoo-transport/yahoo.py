@@ -87,10 +87,10 @@ class Transport:
         badlist = []
         for each in wrsocketlist.keys():
             try:
-            	if each.fileno() == -1:
+                if each.fileno() == -1:
                     badlist.append(each)
             except:
-            	    badlist.append(each)
+                    badlist.append(each)
         for each in badlist:
             del wrsocketlist[each]
         return
@@ -107,6 +107,7 @@ class Transport:
         self.jabber.RegisterHandler('iq',self.xmpp_iq_register_get, typ = 'get', ns=NS_REGISTER)
         self.jabber.RegisterHandler('iq',self.xmpp_iq_register_set, typ = 'set', ns=NS_REGISTER)
         self.jabber.RegisterHandler('iq',self.xmpp_iq_avatar, typ = 'get', ns='jabber:iq:avatar')
+        self.jabber.RegisterHandler('iq',self.xmpp_iq_vcard, typ = 'get', ns=NS_VCARD)
         #self.jabber.RegisterHandler('iq',self.xmpp_iq_notimplemented)
         #self.jabber.RegisterHandler('iq',self.xmpp_iq_mucadmin_set,typ = 'set', ns=NS_MUC_ADMIN)
         #self.jabber.RegisterHandler('iq',self.xmpp_iq_mucadmin_get,typ = 'get', ns=NS_MUC_ADMIN)
@@ -490,8 +491,8 @@ class Transport:
                     p = [Node('identity',attrs={'category':'client','type':'yahoo','name':to.getNode()})]
                     #Individual feature code goes here
                     #Avatar (old style)
-                    if userfile[fromjid.getStripped().encode('utf8')].has_key('avatar'):
-                        if userfile[fromjid.getStripped().encode('utf8')]['avatar'].has_key(to.getNode()):
+                    if userfile[fromjid.getStripped().encode('utf-8')].has_key('avatar'):
+                        if userfile[fromjid.getStripped().encode('utf-8')]['avatar'].has_key(to.getNode()):
                             p.append(Node('feature', attrs={'var':'jabber:iq:avatar'}))
                     m.setQueryPayload(p)
                     m.setID(id)
@@ -673,7 +674,7 @@ class Transport:
             self.jabberqueue(i)
         else:
             self.jabberqueue(Error(event,ERR_BAD_REQUEST))
-       	raise dispatcher.NodeProcessed
+        raise dispatcher.NodeProcessed
 
     def xmpp_iq_register_set(self, con, event):
         if event.getTo() == hostname:
@@ -743,11 +744,11 @@ class Transport:
                 self.jabberqueue(Error(event,ERR_BAD_REQUEST))
         else:
             self.jabberqueue(Error(event,ERR_BAD_REQUEST))
-	raise dispatcher.NodeProcessed
+        raise dispatcher.NodeProcessed
 
     def xmpp_iq_avatar(self, con, event):
         fromjid = event.getFrom()
-        fromstripped = fromjid.getStripped()
+        fromstripped = fromjid.getStripped().encode('utf-8')
         if userfile.has_key(fromstripped):
             if userfile[fromstripped].has_key('avatar'):
                 if userfile[fromstripped]['avatar'].has_key(event.getTo().getNode()):
@@ -755,12 +756,33 @@ class Transport:
                     m.setID(event.getID())
                     self.jabberqueue(m)
                 else:
-                    self.jabberqueue(Error(event,ERR_NOT_FOUND))
+                    self.jabberqueue(Error(event,ERR_ITEM_NOT_FOUND))
             else:
-                self.jabberqueue(Error(event,ERR_NOT_FOUND))
+                self.jabberqueue(Error(event,ERR_ITEM_NOT_FOUND))
         else:
-            self.jabberqueue(Error(event,ERR_NOT_FOUND))
-      	raise dispatcher.NodeProcessed
+            self.jabberqueue(Error(event,ERR_ITEM_NOT_FOUND))
+        raise dispatcher.NodeProcessed
+
+    def xmpp_iq_vcard(self, con, event):
+        fromjid = event.getFrom()
+        fromstripped = fromjid.getStripped().encode('utf-8')
+        if userfile.has_key(fromstripped):
+            if userfile[fromstripped].has_key('avatar'):
+                if userfile[fromstripped]['avatar'].has_key(event.getTo().getNode()):
+                    m = Iq(to = event.getFrom(), frm=event.getTo(), typ = 'result')
+                    m.setID(event.getID())
+                    v = m.addChild(name='vCard', namespace=NS_VCARD)
+                    p = v.addChild(name='PHOTO')
+                    p.setTagData(tag='TYPE', val='image/png')
+                    p.setTagData(tag='BINVAL', val=base64.encodestring(userfile[fromstripped]['avatar'][event.getTo().getNode()][1]))
+                    self.jabberqueue(m)
+                else:
+                    self.jabberqueue(Error(event,ERR_ITEM_NOT_FOUND))
+            else:
+                self.jabberqueue(Error(event,ERR_ITEM_NOT_FOUND))
+        else:
+            self.jabberqueue(Error(event,ERR_ITEM_NOT_FOUND))
+        raise dispatcher.NodeProcessed
 
     def y_avatar(self,fromjid,yid,avatar):
         if avatar != None:
@@ -1070,14 +1092,20 @@ class Transport:
         #raise xmpp.NodeProcessed
 
 if __name__ == '__main__':
-    userfile = shelve.open('user.dbm')
+    if 'PID' in os.environ:
+        open(os.environ['PID'],'w').write(`os.getpid()`)
     configfile = ConfigParser.ConfigParser()
     configfile.add_section('yahoo')
     try:
-        cffile = open('transport.ini','r')
+        configfilename = 'transport.ini'
+        cffile = open(configfilename,'r')
     except IOError:
-        print "Transport requires configuration file, please supply"
-        sys.exit(1)
+        try:
+            configfilename = '/etc/jabber/jabber-yahoo.conf'
+            cffile = open(configfilename,'r')
+        except IOError:
+            print "Transport requires configuration file, please supply"
+            sys.exit(1)
     configfile.readfp(cffile)
     server = configfile.get('yahoo','Server')
     #print server
@@ -1093,6 +1121,12 @@ if __name__ == '__main__':
         localaddress = '0.0.0.0'
     if configfile.has_option('yahoo','Charset'):
         charset = configfile.get('yahoo','Charset')
+    if configfile.has_option('yahoo','UserFile'):
+        userfilepath = configfile.get('yahoo','UserFile')
+    else:
+        userfilepath = 'user.dbm'
+    userfile = shelve.open(userfilepath)
+
     global connection
     connection = client.Component(hostname,port)
     trans = Transport(connection)
