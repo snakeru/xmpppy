@@ -31,7 +31,7 @@ def getcata(cata):
         data1 = unicode(r1.read(),'utf-8','replace')
         #print data1
         try:
-	    t = htmlutils.XHTML2Node(data1)
+            t = htmlutils.XHTML2Node(data1)
         except:
             return None
         try:
