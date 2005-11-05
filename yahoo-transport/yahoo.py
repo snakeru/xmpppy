@@ -8,6 +8,7 @@ from curphoo import cpformat
 import ConfigParser, time, select, shelve, ylib, os, roomlist, sha, base64, socket
 from toolbox import *
 import re
+import traceback
 #import dummy_threading as _threading
 
 VERSTR = 'XMPPPY Yahoo! Transport (Dev)'
@@ -1127,6 +1128,16 @@ if __name__ == '__main__':
     else:
         userfilepath = 'user.dbm'
     userfile = shelve.open(userfilepath)
+    logfile = None
+    if configfile.has_option('yahoo','LogFile'):
+        logfilepath = configfile.get('yahoo','LogFile')
+        logfile = open(logfilepath,'a')
+    fatalerrors = True
+    if configfile.has_option('yahoo','FatalErrors'):
+        if not configfile.get('yahoo','FatalErrors').lower() in ['true', '1', 'yes', 'false', '0', 'no']:
+             print "Invalid setting for FatalErrors: " + configfile.get('yahoo','FatalErrors')
+             sys.exit(1)
+        fatalerrors = configfile.get('yahoo','FatalErrors').lower() in ['true', '1', 'yes']
 
     global connection
     connection = client.Component(hostname,port)
@@ -1170,17 +1181,33 @@ if __name__ == '__main__':
 ##                        print "badconn"
 ##                        trans.findbadconn()
         for each in i:
-            try:
-                if rdsocketlist[each] == 'xmpp':
+            if rdsocketlist[each] == 'xmpp':
+                try:
                     connection.Process(1)
-                    if not connection.isConnected():  trans.xmpp_disconnect()
-                else:
-                   try:
-                      rdsocketlist[each].Process()
-                   except socket.error:
-                      trans.y_closed(rdsocketlist[each])
-            except KeyError:
-                pass
+                except IOError:
+                    trans.xmpp_disconnect()
+                except:
+                    if logfile != None:
+                        traceback.print_exc(file=logfile)
+                        logfile.flush()
+                    if fatalerrors:
+                        _pendingException = sys.exc_info()
+                        raise _pendingException[0], _pendingException[1], _pendingException[2]
+                    traceback.print_exc()
+                if not connection.isConnected():  trans.xmpp_disconnect()
+            else:
+                try:
+                    rdsocketlist[each].Process()
+                except socket.error:
+                   trans.y_closed(rdsocketlist[each])
+                except:
+                    if logfile != None:
+                        traceback.print_exc(file=logfile)
+                        logfile.flush()
+                    if fatalerrors:
+                        _pendingException = sys.exc_info()
+                        raise _pendingException[0], _pendingException[1], _pendingException[2]
+                    traceback.print_exc()
         for each in o:
             try:
                 if rdsocketlist[each] == 'xmpp':
@@ -1199,4 +1226,13 @@ if __name__ == '__main__':
         for each in timerlist:
             #print int(time.time())%each[0]-each[1]
             if not (int(time.time())%each[0]-each[1]):
-                apply(each[2],each[3])
+                try:
+                    apply(each[2],each[3])
+                except:
+                    if logfile != None:
+                        traceback.print_exc(file=logfile)
+                        logfile.flush()
+                    if fatalerrors:
+                        _pendingException = sys.exc_info()
+                        raise _pendingException[0], _pendingException[1], _pendingException[2]
+                    traceback.print_exc()
