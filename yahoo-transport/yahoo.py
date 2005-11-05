@@ -1079,8 +1079,9 @@ class Transport:
             #m.setTagAttr('query','type','yahoo')
             #m.setTagAttr('query','jid','hostname')
             m.setPayload([Node('service',attrs = {'type':'yahoo','name':'xmpp Yahoo Transport','jid':hostname},payload=[Node('ns',payload=NS_MUC),Node('ns',payload=NS_REGISTER)])])
+        m.setID(event.getID())
         self.jabberqueue(m)
-        #raise xmpp.NodeProcessed
+        raise dispatcher.NodeProcessed
 
     def xmpp_iq_version(self, con, event):
         fromjid = event.getFrom()
@@ -1089,7 +1090,7 @@ class Transport:
         m = Iq(to = fromjid, frm = to, typ = 'result', queryNS=NS_VERSION, payload=[Node('name',payload=VERSTR), Node('version',payload='0.1'),Node('os',payload='%s %s %s' % (os.uname()[0],os.uname()[2],os.uname()[4]))])
         m.setID(id)
         self.jabberqueue(m)
-        #raise xmpp.NodeProcessed
+        raise dispatcher.NodeProcessed
 
 if __name__ == '__main__':
     if 'PID' in os.environ:
