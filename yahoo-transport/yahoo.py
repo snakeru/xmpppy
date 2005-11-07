@@ -141,6 +141,8 @@ class Transport:
     def xmpp_message(self, con, event):
         resource = 'messenger'
         fromjid = event.getFrom()
+        if fromjid == None:
+            return
         fromstripped = fromjid.getStripped().encode('utf8')
         if event.getBody() == None:
             return
@@ -966,7 +968,7 @@ class Transport:
         self.jabberqueue(Message(typ = 'groupchat', frm = '%s@%s/%s' % (room.encode('hex'),chathostname,nick),to=to,body=txt))
 
     def y_calendar(self,yobj,url,desc):
-        m = Message(to=yobj.fromjid,typ='headline', subject = "Yahoo Calendar Event", body = desc)
+        m = Message(frm=hostname,to=yobj.fromjid,typ='headline', subject = "Yahoo Calendar Event", body = desc)
         p = m.setTag('x', namespace = 'jabber:x:oob')
         p.addChild(name = 'url',payload=url)
         self.jabberqueue(m)
@@ -977,8 +979,8 @@ class Transport:
         else:
             bfrom = ''
         if fromaddr != None:
-            bfrom = bfrom + ' < ' + stripformatting(fromaddr) + ' > '
-        m = Message(to=yobj.fromjid,typ='headline', subject = "Yahoo Email Event", body = 'From: %s\nSubject: %s'% (unicode(bfrom,'utf-8','replace'),unicode(stripformatting(subj),'utf-8','replace')))
+            bfrom = bfrom + ' <' + stripformatting(fromaddr) + '>'
+        m = Message(frm=hostname,to=yobj.fromjid,typ='headline', subject = "Yahoo Email Event", body = 'From: %s\nSubject: %s'% (unicode(bfrom,'utf-8','replace'),unicode(stripformatting(subj),'utf-8','replace')))
         self.jabberqueue(m)
 
     def y_reg_login(self,yobj):
@@ -1188,11 +1190,13 @@ if __name__ == '__main__':
                     trans.xmpp_disconnect()
                 except:
                     if logfile != None:
+                        logfile.write(time.strftime('%a %d %b %Y %H:%M:%S\n'))
                         traceback.print_exc(file=logfile)
                         logfile.flush()
                     if fatalerrors:
                         _pendingException = sys.exc_info()
                         raise _pendingException[0], _pendingException[1], _pendingException[2]
+                    print(time.strftime('%a %d %b %Y %H:%M:%S'))
                     traceback.print_exc()
                 if not connection.isConnected():  trans.xmpp_disconnect()
             else:
@@ -1202,11 +1206,13 @@ if __name__ == '__main__':
                    trans.y_closed(rdsocketlist[each])
                 except:
                     if logfile != None:
+                        logfile.write(time.strftime('%a %d %b %Y %H:%M:%S\n'))
                         traceback.print_exc(file=logfile)
                         logfile.flush()
                     if fatalerrors:
                         _pendingException = sys.exc_info()
                         raise _pendingException[0], _pendingException[1], _pendingException[2]
+                    print(time.strftime('%a %d %b %Y %H:%M:%S'))
                     traceback.print_exc()
         for each in o:
             try:
@@ -1230,9 +1236,11 @@ if __name__ == '__main__':
                     apply(each[2],each[3])
                 except:
                     if logfile != None:
+                        logfile.write(time.strftime('%a %d %b %Y %H:%M:%S\n'))
                         traceback.print_exc(file=logfile)
                         logfile.flush()
                     if fatalerrors:
                         _pendingException = sys.exc_info()
                         raise _pendingException[0], _pendingException[1], _pendingException[2]
+                    print(time.strftime('%a %d %b %Y %H:%M:%S'))
                     traceback.print_exc()
