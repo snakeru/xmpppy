@@ -12,7 +12,7 @@ class MucUser(Node):
     # Muc User Helper
     def __init__(self,status = None, nick = None, jid = None, affiliation = None, role = None, reason = None, actor = None, node = None):
         Node.__init__(self, 'x', node = node)
-        if not Node:
+        if not node:
             self.setNamespace(NS_MUC_USER)
         if jid != None:
             self.setJid(jid)

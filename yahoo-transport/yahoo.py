@@ -366,9 +366,8 @@ class Transport:
                             #Single resource case
                             #print userlist[fromstripped].xresources
                             if userlist[fromstripped].xresources == {}:
-                                #print 'Delete item from userlist'
+                                print 'No more resource logins'
                                 yobj=userlist[fromstripped]
-                                self.jabberqueue(Presence(to = fromjid, frm = hostname, typ='unavailable'))
                                 if yobj.pripingobj in timerlist:
                                     timerlist.remove(yobj.pripingobj)
                                 if yobj.secpingobj in timerlist:
@@ -481,12 +480,12 @@ class Transport:
         fromjid = event.getFrom()
         to = event.getTo()
         id = event.getID()
-        if event.getTo() == hostname:
+        if to == hostname:
             m = Iq(to=fromjid,frm=to, typ='result', queryNS=NS_DISCO_INFO, payload=[Node('identity',attrs={'category':'gateway','type':'yahoo','name':VERSTR}),Node('feature',attrs={'var':NS_REGISTER}),Node('feature',attrs={'var':NS_VERSION})])
             m.setID(id)
             self.jabberqueue(m)
             #raise dispatcher.NodeProcessed
-        elif event.getTo().getDomain() == hostname:
+        elif to.getDomain() == hostname:
             if userlist.has_key(fromjid.getStripped()):
                 #print userlist[fromjid.getStripped()].roster
                 if userlist[fromjid.getStripped()].roster.has_key(to.getNode()):
@@ -504,9 +503,9 @@ class Transport:
                     self.jabberqueue(Error(event,ERR_NOT_ACCEPTABLE))
             else:
                 self.jabberqueue(Error(event,ERR_NOT_ACCEPTABLE))
-        elif event.getTo().getDomain() == chathostname:
-            print (event.getTo().getNode()), type(event.getQuerynode())
-            if event.getTo().getNode() == None or event.getTo().getNode() == '':
+        elif to.getDomain() == chathostname:
+            print (to.getNode()), type(event.getQuerynode())
+            if to.getNode() == None or to.getNode() == '':
                 if event.getQuerynode() == None:
                     print 'catagory case'
                     m = Iq(to=fromjid,frm=to,typ='result',queryNS=NS_DISCO_INFO, payload=[Node('identity',attrs={'category':'conference','type':'yahoo','name':'Yahoo public chat rooms'}),Node('feature',attrs={'var':NS_MUC})])
@@ -524,7 +523,7 @@ class Transport:
             else:
                 #print 'item case', event.getQuerynode().encode('utf-8')
                 try:
-                    str = unicode(event.getTo().getNode().encode('utf-8').decode('hex'),'utf-8','strict')
+                    str = unicode(to.getNode().encode('utf-8').decode('hex'),'utf-8','strict')
                     print str.encode('utf-8')
                     info = None
                     if self.catlist.has_key(event.getQuerynode()):
@@ -845,7 +844,10 @@ class Transport:
         yobj.secpingtime = time.time()
         yobj.secpingobj=(freq,offset,self.yahooqueue,[yobj.fromjid, yobj.ymsg_send_secping()])
         timerlist.append(yobj.secpingobj)
-        self.jabberqueue(Presence(to = yobj.fromjid, frm = hostname))
+        for each in yobj.xresources.keys():
+            mjid = JID(yobj.fromjid)
+            mjid.setResource(each)
+            self.jabberqueue(Presence(to = mjid, frm = hostname))
         yobj.handlers['loginfail']= self.y_loginfail
         yobj.handlers['login']= self.y_closed
         yobj.connok = True
@@ -1015,9 +1017,10 @@ class Transport:
         if resource != None:
             fromjid = JID(fromjid)
             fromjid.setResource(resource)
+        self.jabberqueue(Presence(to=fromjid,frm = hostname))
         for each in userlist[fromstripped].roster:
             if userlist[fromstripped].roster[each][0] == 'available':
-                self.jabberqueue(Presence(frm = '%s@%s' % (each,hostname), to = fromjid))
+                self.jabberqueue(Presence(frm = '%s@%s/messenger' % (each,hostname), to = fromjid))
 
     def y_send_offline(self,fromjid,resource=None):
         print fromjid,userlist[fromjid].roster
@@ -1025,9 +1028,11 @@ class Transport:
         if resource != None:
             fromjid = JID(fromjid)
             fromjid.setResource(resource)
+        self.jabberqueue(Presence(to=fromjid,frm = hostname, typ='unavailable'))
         for each in userlist[fromstripped].roster:
             if userlist[fromstripped].roster[each][0] == 'available':
-                self.jabberqueue(Presence(frm = '%s@%s' % (each,hostname), to = fromjid, typ='unavailable'))
+                self.jabberqueue(Presence(frm = '%s@%s/messenger' % (each,hostname), to = fromjid, typ='unavailable'))
+                self.jabberqueue(Presence(frm = '%s@%s/chat' % (each,hostname), to = fromjid, typ='unavailable'))
 
     #chat room functions
     def y_chat_login(self,fromjid):
@@ -1047,20 +1052,26 @@ class Transport:
                 userlist[fromjid].roomlist[room]['byyid'][info['yip']] = info
                 if not info.has_key('nick'):
                     info['nick'] = info['yip']
+                tojid = JID(fromjid)
+                tojid.setResource(userlist[fromjid].chatresource)
                 #print info['yip'],userlist[fromjid].username
                 if info['yip'] == userlist[fromjid].username:
-                    #jid = fromjid
+                    jid = tojid
                     print info['nick'], userlist[fromjid].nick
                     if info['nick'] != userlist[fromjid].nick:
-                        jid = JID(fromjid)
-                        jid.setResource(userlist[fromjid].chatresource)
-                        p = Presence(to = jid, frm = '%s@%s/%s' % (room.encode('hex'),chathostname,userlist[fromjid].nick), typ='unavailable')
+                        # join room with wrong nick
+                        p = Presence(to = tojid, frm = '%s@%s/%s' % (room.encode('hex'),chathostname,userlist[fromjid].nick))
+                        p.addChild(node=MucUser(jid = jid, nick = userlist[fromjid].nick, role = 'participant', affiliation = 'none'))
+                        self.jabberqueue(p)
+                        # then leave/change to the right nick
+                        p = Presence(to = tojid, frm = '%s@%s/%s' % (room.encode('hex'),chathostname,userlist[fromjid].nick), typ='unavailable')
                         p.addChild(node=MucUser(jid = jid, nick = info['nick'], role = 'participant', affiliation = 'none', status = 303))
                         self.jabberqueue(p)
+                        userlist[fromjid].nick = info['nick']
                 else:
                     jid = '%s@%s' % (info['yip'],hostname)
                 userlist[fromjid].roomlist[room]['bynick'][info['nick']]= info['yip']
-                self.jabberqueue(Presence(frm = '%s@%s/%s' % (room.encode('hex'),chathostname,info['nick']), to = fromjid, payload=[MucUser(role='participant',affiliation='none',jid = jid)]))
+                self.jabberqueue(Presence(frm = '%s@%s/%s' % (room.encode('hex'),chathostname,info['nick']), to = tojid, payload=[MucUser(role='participant',affiliation='none',jid = jid)]))
 
     def y_chat_leave(self,fromjid,room,yid,nick):
         # Need to add some cleanup code

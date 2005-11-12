@@ -189,13 +189,13 @@ class YahooCon:
                         j = i%4
                         k= j%2
                         if i/4:
-                            print "contact is on games"
+                            print "contact is off games"
                         if not j/2:
                             if self.resources.has_key(pay[each][7]):
                                 if 'chat' in self.resources[pay[each][7]]:
                                     self.resources[pay[each][7]].remove('chat')
-                                    if self.handlers.has_key('chatonline'):
-                                        self.handlers['chatonline'](self,pay[each][7])
+                                    if self.handlers.has_key('chatoffline'):
+                                        self.handlers['chatoffline'](self,pay[each][7])
                         if not k:
                             if self.resources.has_key(pay[each][7]):
                                 if 'messenger' in self.resources[pay[each][7]]:
