@@ -1,11 +1,13 @@
 #! /usr/bin/env python
+# $Id$
+version = 'CVS ' + '$Revision$'.split()[1]
 
 # Yahoo Transport June 2004
 from xmpp import *
 from xmpp.protocol import *
 from xmpp.simplexml import Node
 from curphoo import cpformat
-import ConfigParser, time, select, shelve, ylib, os, roomlist, sha, base64, socket
+import ConfigParser, sys, time, select, shelve, ylib, os, platform, roomlist, sha, base64, socket
 from toolbox import *
 import re
 import traceback
@@ -359,9 +361,9 @@ class Transport:
                     if userlist.has_key(fromstripped):
                         #print 'Resource: ', event.getFrom().getResource(), "To Node: ",event.getTo().getNode()
                         if event.getTo().getNode() =='':
+                            self.y_send_offline(fromstripped,event.getFrom().getResource())
                             if userlist[fromstripped].xresources.has_key(event.getFrom().getResource()):
                                 del userlist[fromstripped].xresources[event.getFrom().getResource()]
-                                self.y_send_offline(fromstripped,event.getFrom().getResource())
                                 self.xmpp_presence_do_update(event,fromstripped)
                             #Single resource case
                             #print userlist[fromstripped].xresources
@@ -1101,7 +1103,8 @@ class Transport:
         fromjid = event.getFrom()
         to = event.getTo()
         id = event.getID()
-        m = Iq(to = fromjid, frm = to, typ = 'result', queryNS=NS_VERSION, payload=[Node('name',payload=VERSTR), Node('version',payload='0.1'),Node('os',payload='%s %s %s' % (os.uname()[0],os.uname()[2],os.uname()[4]))])
+        uname = platform.uname()
+        m = Iq(to = fromjid, frm = to, typ = 'result', queryNS=NS_VERSION, payload=[Node('name',payload=VERSTR), Node('version',payload=version),Node('os',payload=('%s %s %s' % (uname[0],uname[2],uname[4])).strip())])
         m.setID(id)
         self.jabberqueue(m)
         raise dispatcher.NodeProcessed
