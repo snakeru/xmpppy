@@ -205,7 +205,7 @@ class YahooCon:
                     if self.resources[pay[each][7]] == []:
                         self.roster[pay[each][7]]=('unavailable', None, None)
         elif len(pay[0].keys()) == 0:
-            self.handlers['loggedoff']()
+            self.handlers['closed'](self)
 
     def ymsg_notification(self,hdr,pay):
         if pay[0].has_key(20):
