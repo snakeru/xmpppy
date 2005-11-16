@@ -102,8 +102,7 @@ class YahooCon:
         session = hdr[5]
         self.session=session
         chalstr = pay[0][94]
-        crypt1 = YahooMD5.getstr1(self.username,self.password,chalstr)
-        crypt2 = YahooMD5.getstr2(self.username,self.password,chalstr)
+        (crypt1, crypt2) = YahooMD5.curphoo_process_auth(self.username,self.password,chalstr)
         npay = ymsg_mkargu({6:crypt1,96:crypt2,0:self.username,1:self.username,2:self.username,135:'5,6,0,1358',148:'360'})
         nhdr = ymsg_mkhdr(self.version,len(npay),Y_challenge,0x5a55aa55,self.session)
         return nhdr+npay
