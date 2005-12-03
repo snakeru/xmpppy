@@ -116,7 +116,7 @@ def curphoo_process_auth(username, password, seed):
     except 'done':
         pass  
 
-    x = ord(comparison_src[3]) << 24 | ord(comparison_src[2]) << 16 | ord(comparison_src[1]) << 8 | ord(comparison_src[0])
+    x = ord(comparison_src[3]) << 24l | ord(comparison_src[2]) << 16 | ord(comparison_src[1]) << 8 | ord(comparison_src[0])
     x = yahoo_xfrm( table, depth, x )
     x = yahoo_xfrm( table, depth, x )
     magic_key_char = chr(x & 0xFF) + chr(x >> 8 & 0xFF) + chr(x >> 16 & 0xFF) + chr(x >> 24 & 0xFF)

@@ -4598,17 +4598,17 @@ def yahoo_xfrm(table, depth, seed):
             seed = seed * xfrm[1] + xfrm[2]
         elif xfrm[0] == LOOKUP:
             arg = xfrm[1]
-            seed = arg[A( seed )] | arg[B( seed )] << 8 | arg[C( seed )] << 16 | arg[D( seed )] << 24
+            seed = arg[A( seed )] | arg[B( seed )] << 8 | arg[C( seed )] << 16 | arg[D( seed )] << 24l
         elif xfrm[0] == BITFLD:
             arg = xfrm[1]
             z = 0
             for j in range(32):
-                z = ((( seed >> j ) & 1 ) << arg[j] ) | ( ~( 1 << arg[j] ) & z )
+                z = ((( seed >> j ) & 1 ) << arg[j] ) | ( ~( 1l << arg[j] ) & z )
             seed = z
         if( depth - i == 1 ):
             return seed
-        z = (((((( A( seed ) * 0x9E3779B1 ) ^ B( seed )) * 0x9E3779B1 ) ^ C( seed )) * 0x9E3779B1 ) ^ D( seed )) * 0x9E3779B1
+        z = (((((( A( seed ) * 0x9E3779B1l ) ^ B( seed )) * 0x9E3779B1l ) ^ C( seed )) * 0x9E3779B1l ) ^ D( seed )) * 0x9E3779B1l
         n = (((( z ^ ( z >> 8 )) >> 16 ) ^ z ) ^ ( z >> 8 )) & 0xFF
         seed *= 0x00010DCD
-        seed &= 0xffffffff
+        seed &= 0xffffffffl
     return seed
