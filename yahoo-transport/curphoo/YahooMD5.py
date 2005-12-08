@@ -180,6 +180,10 @@ if __name__ == '__main__':
         ('myuser'   , 'mypass'  , 'f%g|8%(p+4+f*l&h|d-h*(g^d*q^2&w+o+(x&i/o+4-3)/s^(d|j+j-a*3^u|(4&q%x))))', 'G=Ai,p=6B,W=f6,I=BB,I=CC;V=bp;P=17,p=ee;r=mj;p=eA;', 'k=8c,h=8h,Y=Eb;W=oo,h=jh,K=cd,J=6m,r=Fd;W=l2;Q=pi;'),
         ('username' , 'password', 'g*g/3&5-k-(4/i/c*d^v|r^m&s%2+(z*v%j%q|l-h+v|t^(b&4-q|2)|n)/8*l|z&x%v)'  , 'O=Cg,r=pb,N=bp,O=Fn;F=e8;F=33;p=l9;S=bj,m=A0;p=ci,', 'p=Bh,O=D1,T=f0;D=0B;G=ag;H=na,C=cB,E=4F;T=fg;A=2j;'),
         ('myuser'   , 'mypass'  , 'g*g/3&5-k-(4/i/c*d^v|r^m&s%2+(z*v%j%q|l-h+v|t^(b&4-q|2)|n)/8*l|z&x%v)'  , 'J=C9,w=1j,F=An,A=pg,D=AE;L=E7;P=lk;N=F0,Y=28,R=EC,', 'O=kf,r=4C;D=b9;J=nf,r=EC;E=2F;w=c4;k=em,G=8A,S=dE;'),
+        ('username' , 'password', '2&k%(1%k-i+m/o/u)*v-k|g-a%h|5-g%z*(8-(h|4|q-e+(a%5&w)+r/d%a+(q&a%g+s%e)))', 'S=2l,C=2e,V=Co,O=72,Y=oD,X=B9,E=l4,A=0n,h=3E;m=47;', 'S=2a;E=ap;k=m1,O=cA;w=bd,V=Ae,Q=dC;C=Fp;h=iF;M=7B,'),
+        ('myuser'   , 'mypass'  , '2&k%(1%k-i+m/o/u)*v-k|g-a%h|5-g%z*(8-(h|4|q-e+(a%5&w)+r/d%a+(q&a%g+s%e)))', 'U=A5;r=a6;V=pF,T=ke;H=e8,w=g7,Q=9e;p=ci,m=60,r=3e,', 'k=FF;A=gh;Q=dm;W=j7;k=Ab,I=27,F=1d;X=nm;S=CF;w=1E,'),
+        ('username' , 'password', 'p/x*c&o/u+5^(v/e/8%o|d)%u-u|(v)-i/p&(q|r&e/v*r&(e+b|8^5^w*o^5%e/w)/f|l)', 'U=c2;A=g4;X=iD,h=6o,I=m6,M=Ee;p=1c,C=p6;J=pg;B=el,', 'p=o8,Y=a5;B=fd,C=ck,N=7f,h=5d,r=36,I=C8,R=bo,C=6j;'),
+        ('myuser'   , 'mypass'  , 'p/x*c&o/u+5^(v/e/8%o|d)%u-u|(v)-i/p&(q|r&e/v*r&(e+b|8^5^w*o^5%e/w)/f|l)', 'W=md;k=c3;A=Ai;k=fo;A=ba,L=A9;L=ne,I=3e;D=6C;W=f1,', 'T=hi;k=B0,W=c6;T=62,h=dC;r=DA;p=hD;J=99,h=4i,X=98,'),
     )
 
     for user, pwd, chal, str1true, str2true in test_cases:
