@@ -4606,7 +4606,7 @@ def yahoo_xfrm(table, depth, seed):
                 z = ((( seed >> j ) & 1 ) << arg[j] ) | ( ~( 1l << arg[j] ) & z )
             seed = z
         if( depth - i == 1 ):
-            return seed
+            return seed & 0xffffffffl
         z = (((((( A( seed ) * 0x9E3779B1l ) ^ B( seed )) * 0x9E3779B1l ) ^ C( seed )) * 0x9E3779B1l ) ^ D( seed )) * 0x9E3779B1l
         n = (((( z ^ ( z >> 8 )) >> 16 ) ^ z ) ^ ( z >> 8 )) & 0xFF
         seed *= 0x00010DCD
