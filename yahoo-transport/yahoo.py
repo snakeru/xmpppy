@@ -34,20 +34,15 @@ def stripformatting(text):
     return cpformat.do(text)
    
 
-def connectxmpp(handler_reg_func):
-    #global connection
-    #connection = client.Component(hostname,port)
-    #try: connection.auth(hostname,secret)
-    #except: pass
-    if connection.connect((server,port)) == 'tcp':
-        handler_reg_func()
-        a = connection.auth(hostname,secret)
-        if a: return a
-    while 1:
-        time.sleep(5)
-        connected=connection.reconnectAndReauth()
-        if connected: break
-    connection.UnregisterDisconnectHandler(connection.DisconnectHandler)
+def connectxmpp(handlerreg):
+    connected = connection.connect((server,port))
+    #print repr(connected)
+    if connected:
+        if handlerreg != None:
+            handlerreg()
+        #print "try auth"
+        connected = connection.auth(hostname,secret)
+        #print "auth return",connected
     return connected
 
 def fromyahoo(userstr):
@@ -1159,7 +1154,7 @@ if __name__ == '__main__':
     connection = client.Component(hostname,port)
     trans = Transport(connection)
     if not connectxmpp(trans.register_handlers):
-        print "Password mismatch!"
+        print "Could not connect to server, or password mismatch!"
         sys.exit(1)
     rdsocketlist[connection.Connection._sock]='xmpp'
     while 1:
@@ -1210,7 +1205,7 @@ if __name__ == '__main__':
                     if fatalerrors:
                         _pendingException = sys.exc_info()
                         raise _pendingException[0], _pendingException[1], _pendingException[2]
-                    print(time.strftime('%a %d %b %Y %H:%M:%S'))
+                    sys.stderr.write(time.strftime('%a %d %b %Y %H:%M:%S\n'))
                     traceback.print_exc()
                 if not connection.isConnected():  trans.xmpp_disconnect()
             else:
@@ -1226,7 +1221,7 @@ if __name__ == '__main__':
                     if fatalerrors:
                         _pendingException = sys.exc_info()
                         raise _pendingException[0], _pendingException[1], _pendingException[2]
-                    print(time.strftime('%a %d %b %Y %H:%M:%S'))
+                    sys.stderr.write(time.strftime('%a %d %b %Y %H:%M:%S\n'))
                     traceback.print_exc()
         for each in o:
             try:
@@ -1256,5 +1251,5 @@ if __name__ == '__main__':
                     if fatalerrors:
                         _pendingException = sys.exc_info()
                         raise _pendingException[0], _pendingException[1], _pendingException[2]
-                    print(time.strftime('%a %d %b %Y %H:%M:%S'))
+                    sys.stderr.write(time.strftime('%a %d %b %Y %H:%M:%S\n'))
                     traceback.print_exc()
