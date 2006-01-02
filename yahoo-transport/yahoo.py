@@ -482,6 +482,13 @@ class Transport:
             m.setID(id)
             self.jabberqueue(m)
             #raise dispatcher.NodeProcessed
+        elif to == chathostname:
+            #if we return disco info for our subnodes when the server asks, then we get added to the server's item list
+            if fromjid == server:
+                return
+            m = Iq(to=fromjid,frm=to, typ='result', queryNS=NS_DISCO_INFO,payload=[Node('identity',attrs={'category':'conference','type':'yahoo','name':'Yahoo public chat rooms'}),Node('feature',attrs={'var':NS_MUC}),Node('feature',attrs={'var':NS_VERSION})])
+            m.setID(id)
+            self.jabberqueue(m)
         elif to.getDomain() == hostname:
             if userlist.has_key(fromjid.getStripped()):
                 #print userlist[fromjid.getStripped()].roster
@@ -1121,11 +1128,16 @@ if __name__ == '__main__':
             sys.exit(1)
     configfile.readfp(cffile)
     server = configfile.get('yahoo','Server')
+    if configfile.has_option('yahoo','ServerUser'):
+        serveruser = configfile.get('yahoo','ServerUser')
+        component = 1
+    else:
+        serveruser = server
+        component = 0
     #print server
     hostname = configfile.get('yahoo','Hostname')
     #print hostname
     chathostname = 'chat.'+hostname
-    confhostname = 'conf.'+hostname
     port = int(configfile.get('yahoo','Port'))
     secret = configfile.get('yahoo','Secret')
     if configfile.has_option('yahoo','LocalAddress'):
@@ -1151,7 +1163,7 @@ if __name__ == '__main__':
         fatalerrors = configfile.get('yahoo','FatalErrors').lower() in ['true', '1', 'yes']
 
     global connection
-    connection = client.Component(hostname,port)
+    connection = client.Component(hostname,port,component=component,domains=[hostname,chathostname])
     trans = Transport(connection)
     if not connectxmpp(trans.register_handlers):
         print "Could not connect to server, or password mismatch!"
