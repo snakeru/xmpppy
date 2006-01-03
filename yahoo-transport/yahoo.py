@@ -41,7 +41,7 @@ def connectxmpp(handlerreg):
         if handlerreg != None:
             handlerreg()
         #print "try auth"
-        connected = connection.auth(hostname,secret)
+        connected = connection.auth(serveruser,secret)
         #print "auth return",connected
     return connected
 
