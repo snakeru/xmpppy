@@ -673,7 +673,7 @@ class Transport:
                     pass
             m = event.buildReply('result')
             m.setQueryNS(NS_REGISTER)
-            m.setQueryPayload([Node('instructions', payload = 'Please provide your Yahoo! username and password'),Node('username',payload=username),Node('password',payload=password)])
+            m.setQueryPayload([Node('instructions', payload = 'Please provide your Yahoo! username and password'),Node('username',payload=username),Node('password',payload=password),Node('registered')])
             self.jabberqueue(m)
             #Add disco#info check to client requesting for rosterx support
             i= Iq(to=event.getFrom(), frm=hostname, typ='get',queryNS=NS_DISCO_INFO)
@@ -713,6 +713,8 @@ class Transport:
                 conf['password']=password
                 userfile[fromjid]=conf
                 userfile.sync()
+                m=event.buildReply('result')
+                self.jabberqueue(m)
                 if userlist.has_key(fromjid):
                     self.y_closed(userlist[fromjid])
                 if not userlist.has_key(fromjid):
