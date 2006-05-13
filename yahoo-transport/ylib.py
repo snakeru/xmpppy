@@ -696,7 +696,7 @@ class YahooCon:
                 break
 
 if __name__ == '__main__':
-    y = YahooCon('YID','password','jid')
+    y = YahooCon('YID','password','jid','')
     while not y.connect():
         print 'sleep'
         time.sleep(5)
