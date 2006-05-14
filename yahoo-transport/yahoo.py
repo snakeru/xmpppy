@@ -17,6 +17,7 @@ from xmpp.simplexml import Node
 from curphoo import cpformat
 import ConfigParser, sys, time, select, shelve, ylib, os, platform, roomlist, sha, base64, socket
 from toolbox import *
+from xmpp.jep0106 import *
 import re
 import traceback
 #import dummy_threading as _threading
@@ -54,6 +55,18 @@ def fromyahoo(userstr):
 
 def toyahoo(userstr):
     return userstr.replace('%','@')
+
+roomenccodere = re.compile('([^-]?)([A-Z-])')
+def RoomEncode(userstr):
+    #return userstr.encode('hex')
+    return JIDEncode(roomenccodere.sub('\\1-\\2', userstr))
+
+roomdeccodere = re.compile('-([a-zA-Z-])')
+def RoomDecode(userstr):
+    #return userstr.decode('hex')
+    def decode(m):
+        return m.group(1).upper()
+    return roomdeccodere.sub(decode, JIDDecode(userstr))
 
 class Transport:
     def __init__(self,jabber):
@@ -204,8 +217,8 @@ class Transport:
                         return
                     if event.getTo().getResource() == None or event.getTo().getResource() == '':
                         print userlist[fromstripped].roomlist, userlist[fromstripped].roomnames
-                        if userlist[fromstripped].roomlist.has_key(event.getTo().getNode().encode('utf-8').decode('hex')):
-                            room = event.getTo().getNode().encode('utf-8').decode('hex')
+                        if userlist[fromstripped].roomlist.has_key(RoomDecode(event.getTo().getNode().encode('utf-8'))):
+                            room = RoomDecode(event.getTo().getNode().encode('utf-8'))
                         elif userlist[fromstripped].roomnames.has_key(event.getTo().getNode()):
                             room = userlist[fromstripped].roomnames[event.getTo().getNode()].encode('utf-8')
                         else:
@@ -391,7 +404,7 @@ class Transport:
                         print "chat presence"
                         try:
                             #print event.getTo().getNode().encode('utf-8').decode('base64')
-                            room = unicode(event.getTo().getNode().encode('utf-8').decode('hex'),'utf-8','strict')
+                            room = unicode(RoomDecode(event.getTo().getNode().encode('utf-8')),'utf-8','strict')
                         except:
                             if userlist[fromstripped].roomnames.has_key(event.getTo().getNode()):
                                 room = userlist[fromstripped].roomnames[event.getTo().getNode()]
@@ -600,14 +613,14 @@ class Transport:
                                 if each['type'] == 'yahoo':
                                     if each.has_key('rooms'):
                                         for c in each['rooms'].keys():
-                                            n = ('%s:%s' % (each['name'],c)).encode('hex')
+                                            n = RoomEncode('%s:%s' % (each['name'],c))
                                             list.append({'jid':'%s@%s'%(n,chathostname),'name':'%s:%s'%(each['name'],c)})
                                             #print list
                     return list
         elif to.getDomain() == chathostname:
             if type == 'info':
                 #print 'item case', to.getNode().encode('utf-8')
-                str = unicode(to.getNode().encode('utf-8').decode('hex'),'utf-8','strict')
+                str = unicode(RoomDecode(to.getNode().encode('utf-8')),'utf-8','strict')
                 lobby,room = str.split(':')
                 #print 'str', str.encode('utf-8')
                 result = {
@@ -956,7 +969,7 @@ class Transport:
             nick = yobj.roomlist[room]['byyid'][yid]['nick']
         else:
             nick = yid
-        self.jabberqueue(Message(typ = 'groupchat', frm = '%s@%s/%s' % (room.encode('hex'),chathostname,nick),to=to,body=txt))
+        self.jabberqueue(Message(typ = 'groupchat', frm = '%s@%s/%s' % (RoomEncode(room),chathostname,nick),to=to,body=txt))
 
     def y_calendar(self,yobj,url,desc):
         m = Message(frm=hostname,to=yobj.fromjid,typ='headline', subject = "Yahoo Calendar Event", body = desc)
@@ -1032,8 +1045,8 @@ class Transport:
     def y_chat_roominfo(self,fromjid,info):
         if not userlist[fromjid].roomlist.has_key(info['room']):
             userlist[fromjid].roomlist[info['room']]={'byyid':{},'bynick':{},'info':info}
-            self.jabberqueue(Presence(frm = '%s@%s' %(info['room'].encode('hex'),chathostname),to=fromjid))
-            self.jabberqueue(Message(frm = '%s@%s' %(info['room'].encode('hex'),chathostname),to=fromjid, typ='groupchat', subject= info['topic']))
+            self.jabberqueue(Presence(frm = '%s@%s' %(RoomEncode(info['room']),chathostname),to=fromjid))
+            self.jabberqueue(Message(frm = '%s@%s' %(RoomEncode(info['room']),chathostname),to=fromjid, typ='groupchat', subject= info['topic']))
 
     def y_chat_join(self,fromjid,room,info):
         if userlist[fromjid].roomlist.has_key(room):
@@ -1049,18 +1062,18 @@ class Transport:
                     print info['nick'], userlist[fromjid].nick
                     if info['nick'] != userlist[fromjid].nick:
                         # join room with wrong nick
-                        p = Presence(to = tojid, frm = '%s@%s/%s' % (room.encode('hex'),chathostname,userlist[fromjid].nick))
+                        p = Presence(to = tojid, frm = '%s@%s/%s' % (RoomEncode(room),chathostname,userlist[fromjid].nick))
                         p.addChild(node=MucUser(jid = jid, nick = userlist[fromjid].nick, role = 'participant', affiliation = 'none'))
                         self.jabberqueue(p)
                         # then leave/change to the right nick
-                        p = Presence(to = tojid, frm = '%s@%s/%s' % (room.encode('hex'),chathostname,userlist[fromjid].nick), typ='unavailable')
+                        p = Presence(to = tojid, frm = '%s@%s/%s' % (RoomEncode(room),chathostname,userlist[fromjid].nick), typ='unavailable')
                         p.addChild(node=MucUser(jid = jid, nick = info['nick'], role = 'participant', affiliation = 'none', status = 303))
                         self.jabberqueue(p)
                         userlist[fromjid].nick = info['nick']
                 else:
                     jid = '%s@%s' % (info['yip'],hostname)
                 userlist[fromjid].roomlist[room]['bynick'][info['nick']]= info['yip']
-                self.jabberqueue(Presence(frm = '%s@%s/%s' % (room.encode('hex'),chathostname,info['nick']), to = tojid, payload=[MucUser(role='participant',affiliation='none',jid = jid)]))
+                self.jabberqueue(Presence(frm = '%s@%s/%s' % (RoomEncode(room),chathostname,info['nick']), to = tojid, payload=[MucUser(role='participant',affiliation='none',jid = jid)]))
 
     def y_chat_leave(self,fromjid,room,yid,nick):
         # Need to add some cleanup code
@@ -1072,7 +1085,7 @@ class Transport:
                 del userlist[fromjid].roomlist[room]['byyid'][yid]
                 jid = JID(fromjid)
                 jid.setResource(userlist[fromjid].chatresource)
-                self.jabberqueue(Presence(frm = '%s@%s/%s' % (room.encode('hex'),chathostname,nick), to= jid, typ = 'unavailable'))
+                self.jabberqueue(Presence(frm = '%s@%s/%s' % (RoomEncode(room),chathostname,nick), to= jid, typ = 'unavailable'))
 
     def xmpp_iq_browse(self, con, event):
         m = Iq(to = event.getFrom(), frm = event.getTo(), typ = 'result', queryNS = NS_BROWSE)
