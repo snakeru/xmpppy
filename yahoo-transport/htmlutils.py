@@ -27,7 +27,7 @@ class NodeBuilder(HTMLParser):
         #self._parser.handle_charref = self.handle_charref
         #self._parser.StartNamespaceDeclHandler = self.handle_namespace_start
         #self.Parse = self._parser.feed
-	HTMLParser.__init__(self)
+        HTMLParser.__init__(self)
         self.__depth = 0
         self._dispatch_depth = 1
         self._document_attrs = None
@@ -38,8 +38,9 @@ class NodeBuilder(HTMLParser):
         self.xmlns="http://www.w3.org/XML/1998/namespace"
 
         if data: 
-        	self.feed(data)
-        	self.close()
+            self.feed(data)
+            self.close()
+
 
     def destroy(self):
         """ Method used to allow class instance to be garbage-collected. """
@@ -59,7 +60,7 @@ class NodeBuilder(HTMLParser):
         #    attrs[self.namespaces[ns]+attr[sp+1:]]=attrs[attr]
         #    del attrs[attr]        #
         for each in attr:
-        	attrs[each[0]]=each[1]
+            attrs[each[0]]=each[1]
         self.__depth += 1
         self.DEBUG(DBG_NODEBUILDER, "DEPTH -> %i , tag -> %s, attrs -> %s" % (self.__depth, tag, `attrs`), 'down')
         if self.__depth == self._dispatch_depth:
@@ -91,7 +92,7 @@ class NodeBuilder(HTMLParser):
 
     def handle_data(self, data):
         """XML Parser callback. Used internally"""
-        print data.strip(),
+        #print data.strip(),
         data = re.sub('&#x([0-9a-f]*;)',self.decode_hextoutf8,data)
         self.DEBUG(DBG_NODEBUILDER, data, 'data')
         if not self._ptr: return
@@ -102,7 +103,7 @@ class NodeBuilder(HTMLParser):
             self.last_is_data = 1
 
     def handle_charref(self,name):
-    	print "Got chardata: ", name
+        print "Got chardata: ", name
 
     def handle_namespace_start(self, prefix, uri):
         """XML Parser callback. Used internally"""
@@ -122,16 +123,16 @@ class NodeBuilder(HTMLParser):
         """ Method called when stream just closed. """
 
     def decode_hextoutf8(self,match):
-    	""" This function decodes the hex string into a utf8 return value, or returns '' """
-    	print 'Hex decoder'
-    	a = match.group(0)[3:len(match.group(0))-1]
-    	if len(a) %2:
-    		a = '0'+a
-    	try:
-    		return unicode('utf8',a.decode('hex'))
-    	except:
-    		return ''
-    	
+        """ This function decodes the hex string into a utf8 return value, or returns '' """
+        print 'Hex decoder'
+        a = match.group(0)[3:len(match.group(0))-1]
+        if len(a) %2:
+            a = '0'+a
+        try:
+            return unicode('utf8',a.decode('hex'))
+        except:
+            return ''
+        
 
 def XHTML2Node(xml):
-	return NodeBuilder(xml).getDom()
+    return NodeBuilder(xml).getDom()
