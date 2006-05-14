@@ -5,6 +5,8 @@ version = 'CVS ' + '$Revision$'.split()[1]
 # Yahoo Transport June 2004
 from xmpp import *
 from xmpp.protocol import *
+from xmpp.browser import *
+from xmpp.commands import *
 from xmpp.simplexml import Node
 from curphoo import cpformat
 import ConfigParser, sys, time, select, shelve, ylib, os, platform, roomlist, sha, base64, socket
@@ -14,18 +16,14 @@ import traceback
 #import dummy_threading as _threading
 
 VERSTR = 'XMPPPY Yahoo! Transport (Dev)'
-
-NS_MUC = 'http://jabber.org/protocol/muc'
-NS_MUC_USER = NS_MUC+'#user'
-NS_MUC_ADMIN = NS_MUC+'#admin'
-NS_MUC_OWNER = NS_MUC+'#owner'
-NS_ROSTERX = 'http://jabber.org/protocol/rosterx'
 rdsocketlist = {}
 wrsocketlist = {}
 userlist = {}
 #each item is a tuple of 4 values, 0 == frequency in seconds, 1 == offset from 0, 2 == function, 3 == arguments
 timerlist = []
 discoresults = {}
+
+NODE_ROSTER='roster'
 
 # colour parsing re: re.sub('\x1b\[([0-9]+)])m','<asci colour=\\1>',string)
 
@@ -96,8 +94,6 @@ class Transport:
     def register_handlers(self):
         self.jabber.RegisterHandler('message',self.xmpp_message)
         self.jabber.RegisterHandler('presence',self.xmpp_presence)
-        self.jabber.RegisterHandler('iq',self.xmpp_iq_discoinfo,typ = 'get', ns=NS_DISCO_INFO)
-        self.jabber.RegisterHandler('iq',self.xmpp_iq_discoitems,typ = 'get', ns=NS_DISCO_ITEMS)
         self.jabber.RegisterHandler('iq',self.xmpp_iq_discoinfo_results,typ = 'result', ns=NS_DISCO_INFO)
         self.jabber.RegisterHandler('iq',self.xmpp_iq_version,typ = 'get', ns=NS_VERSION)
         self.jabber.RegisterHandler('iq',self.xmpp_iq_agents,typ = 'get', ns=NS_AGENTS)
@@ -109,6 +105,13 @@ class Transport:
         #self.jabber.RegisterHandler('iq',self.xmpp_iq_notimplemented)
         #self.jabber.RegisterHandler('iq',self.xmpp_iq_mucadmin_set,typ = 'set', ns=NS_MUC_ADMIN)
         #self.jabber.RegisterHandler('iq',self.xmpp_iq_mucadmin_get,typ = 'get', ns=NS_MUC_ADMIN)
+        self.disco = Browser()
+        self.disco.PlugIn(self.jabber)
+        self.command = Commands(self.disco)
+        self.command.PlugIn(self.jabber)
+        self.disco.setDiscoHandler(self.xmpp_base_disco,node='',jid=hostname)
+        self.disco.setDiscoHandler(self.xmpp_base_disco,node='',jid=chathostname)
+        self.disco.setDiscoHandler(self.xmpp_base_disco,node='',jid='')
 
     def register_ymsg_handlers(self, con):
         con.handlers['online']= self.y_online
@@ -473,185 +476,157 @@ class Transport:
         self.jabberqueue(Error(event,ERR_FEATURE_NOT_IMPLEMENTED))
 
 
-    def xmpp_iq_discoinfo(self, con, event):
-        fromjid = event.getFrom()
+    # New Disco Handlers
+    def xmpp_base_disco(self, con, event, type):
+        fromjid = event.getFrom().getStripped().__str__()
+        fromstripped = event.getFrom().getStripped().encode('utf8')
         to = event.getTo()
-        id = event.getID()
+        node = event.getQuerynode();
         if to == hostname:
-            m = Iq(to=fromjid,frm=to, typ='result', queryNS=NS_DISCO_INFO, payload=[Node('identity',attrs={'category':'gateway','type':'yahoo','name':VERSTR}),Node('feature',attrs={'var':NS_REGISTER}),Node('feature',attrs={'var':NS_VERSION})])
-            m.setID(id)
-            self.jabberqueue(m)
-            #raise dispatcher.NodeProcessed
-        elif to == chathostname:
-            #if we return disco info for our subnodes when the server asks, then we get added to the server's item list
-            if fromjid == server:
-                return
-            m = Iq(to=fromjid,frm=to, typ='result', queryNS=NS_DISCO_INFO,payload=[Node('identity',attrs={'category':'conference','type':'yahoo','name':'Yahoo public chat rooms'}),Node('feature',attrs={'var':NS_MUC}),Node('feature',attrs={'var':NS_VERSION})])
-            m.setID(id)
-            self.jabberqueue(m)
+            if node == None:
+                if type == 'info':
+                    return {
+                        'ids':[
+                            {'category':'gateway','type':'yahoo','name':VERSTR}],
+                        'features':[NS_REGISTER,NS_VERSION,NS_COMMANDS]}
+                if type == 'items':
+                    return [
+                        {'node':NS_COMMANDS,'name':VERSTR + ' Commands','jid':hostname},
+                        {'node':NODE_ROSTER,'name':VERSTR + ' Roster','jid':hostname},
+                        {'jid':chathostname,'name':VERSTR + ' Chatrooms'}]
+            elif node == NODE_ROSTER:
+                if type == 'info':
+                    return {'ids':[],'features':[]}
+                if type == 'items':
+                    list = []
+                    if userlist.has_key(fromstripped):
+                        for each in userlist[fromstripped].roster.keys():
+                            list.append({'jid':'%s@%s' %(each,hostname),'name':each})
+                    return list
+            else:
+                self.jabber.send(Error(event,ERR_ITEM_NOT_FOUND))
+                raise NodeProcessed
         elif to.getDomain() == hostname:
-            if userlist.has_key(fromjid.getStripped()):
-                #print userlist[fromjid.getStripped()].roster
-                if userlist[fromjid.getStripped()].roster.has_key(to.getNode()):
-                    m = Iq(to=fromjid, frm=to,typ='result',queryNS=NS_DISCO_INFO)
-                    p = [Node('identity',attrs={'category':'client','type':'yahoo','name':to.getNode()})]
-                    #Individual feature code goes here
-                    #Avatar (old style)
-                    if userfile[fromjid.getStripped().encode('utf-8')].has_key('avatar'):
-                        if userfile[fromjid.getStripped().encode('utf-8')]['avatar'].has_key(to.getNode()):
-                            p.append(Node('feature', attrs={'var':'jabber:iq:avatar'}))
-                    m.setQueryPayload(p)
-                    m.setID(id)
-                    self.jabberqueue(m)
-                else:
-                    self.jabberqueue(Error(event,ERR_NOT_ACCEPTABLE))
+            if userlist.has_key(fromstripped):
+                #print userlist[fromstripped].roster
+                if type == 'info':
+                    if userlist[fromstripped].roster.has_key(to.getNode()):
+                        features = []
+                        if userfile[fromstripped.encode('utf-8')].has_key('avatar'):
+                            if userfile[fromstripped.encode('utf-8')]['avatar'].has_key(to.getNode()):
+                                features.append({'var':'jabber:iq:avatar'})
+                        return {
+                            'ids':[
+                                {'category':'client','type':'yahoo','name':to.getNode()}],
+                            'features':features}
+                    else:
+                        self.jabberqueue(Error(event,ERR_NOT_ACCEPTABLE))
+                if type == 'items':
+                    if userlist[fromstripped].roster.has_key(to.getNode()):
+                        return []
             else:
                 self.jabberqueue(Error(event,ERR_NOT_ACCEPTABLE))
-        elif to.getDomain() == chathostname:
-            print (to.getNode()), type(event.getQuerynode())
-            if to.getNode() == None or to.getNode() == '':
-                if event.getQuerynode() == None:
-                    print 'catagory case'
-                    m = Iq(to=fromjid,frm=to,typ='result',queryNS=NS_DISCO_INFO, payload=[Node('identity',attrs={'category':'conference','type':'yahoo','name':'Yahoo public chat rooms'}),Node('feature',attrs={'var':NS_MUC})])
-                    m.setID(id)
-                    self.jabberqueue(m)
-                    #raise dispatcher.NodeProcessed
-                else:
-                    print 'catagory item case ',self.chatcat[0][1]
-                    if self.chatcat[0][1].has_key(event.getQuerynode()):
-                        m = Iq(to=fromjid,frm=to,typ='result',queryNS=NS_DISCO_INFO, payload=[Node('identity',attrs={'name':self.chatcat[0][1][event.getQuerynode()]})])
-                        m.setQuerynode(event.getQuerynode())
-                        m.setID(id)
-                        self.jabberqueue(m)
-                        #raise dispatcher.NodeProcessed
+        elif to == chathostname:
+            if node == None:
+                if type == 'info':
+                    #if we return disco info for our subnodes when the server asks, then we get added to the server's item list
+                    if fromstripped == server:
+                        raise NodeProcessed
+                    return {
+                        'ids':[
+                            {'category':'conference','type':'yahoo','name':VERSTR + ' Chatrooms'}],
+                        'features':[NS_MUC,NS_VERSION]}
+                if type == 'items':
+                    if self.chatcat[0][0] < (time.time() - (5*60)):
+                        t = roomlist.getcata(0)
+                        if t != None:
+                            for each in t.keys():
+                                self.chatcat[each] = (time.time(),t[each])
+                    list = []
+                    for each in self.chatcat[0][1]:
+                        list.append({'jid':to,'node':each,'name':self.chatcat[0][1][each]})
+                    return list
             else:
-                #print 'item case', event.getQuerynode().encode('utf-8')
-                try:
-                    str = unicode(to.getNode().encode('utf-8').decode('hex'),'utf-8','strict')
-                    print str.encode('utf-8')
-                    info = None
-                    if self.catlist.has_key(event.getQuerynode()):
-                        lobby,room = str.split(':')
-                        print event.getQuerynode().encode('utf-8'), lobby, room
-                        if self.catlist[event.getQuerynode()][1].has_key(lobby):
-                            t = self.catlist[event.getQuerynode()][1][lobby]
-                            print t
-                            data = {'muc#roominfo_description':t['name'],'muc#roominfo_subject':t['topic'],'muc#roominfo_occupants':t['rooms']['%s'%room]['users']}
-                            print data
-                            info = DataForm(typ = 'result', data= data)
-                            field = info.setField('FORM_TYPE')
-                            field.setType('hidden')
-                            field.setValue('http://jabber.org/protocol/muc#roominfo')
-                            print info
-                    payload = [Node('identity',attrs={'category':'conference','type':'yahoo','name':str}),Node('feature',attrs={'var':NS_MUC})]
-                    if info != None:
-                        payload.append(info)
-                    m = Iq(to=fromjid,frm=to,typ='result',queryNS=NS_DISCO_INFO, payload=payload)
-                    m.setID(id)
-                    self.jabberqueue(m)
-                except:
-                    #pass
-                    self.jabberqueue(Error(event,ERR_NOT_ACCEPTABLE))
-        raise dispatcher.NodeProcessed
+                if type == 'info':
+                    #print 'catagory item case ',self.chatcat[0][1]
+                    if self.chatcat[0][1].has_key(node):
+                        return {
+                            'ids':[
+                                {'name':self.chatcat[0][1][node]}],
+                            'features':[]}
+                if type == 'items':
+                    # Do get room item
+                    if not self.catlist.has_key(node):
+                        t = roomlist.getrooms(node)
+                        if t != None:
+                            self.catlist[node] = (time.time(),t)
+                    else:
+                        if self.catlist[node][0] < (time.time() - 5*60):
+                            t = roomlist.getrooms(node)
+                            #print t
+                            if t != None:
+                                self.catlist[node] = (time.time(),t)
+                    # Do get more categories
+                    #print node.encode('utf-8')
+                    if not self.chatcat.has_key(node):
+                        t = roomlist.getcata(node)
+                        #print t
+                        if t != None:
+                            self.chatcat[node] = (time.time(),t)
+                    else:
+                        if self.chatcat[node][0] < (time.time() - 5*60):
+                            t = roomlist.getcata(node)
+                            #print t
+                            if t != None:
+                                self.chatcat[node] = (time.time(),t)
+                    list = []
+                    if len(node.split('/')) == 1:
+                        #add catagories first
+                        if self.chatcat.has_key(node):
+                            for each in self.chatcat[node][1].keys():
+                                if each != 0 and 0 in self.chatcat[node][1].keys():
+                                    list.append({'jid':to,'node':each,'name':self.chatcat[node][1][0][each]})
+                        # First level of nodes
+                        #print self.catlist[node]
+                        for z in self.catlist[node][1].keys():
+                            each = self.catlist[node][1][z]
+                            if each.has_key('type'):
+                                if each['type'] == 'yahoo':
+                                    if each.has_key('rooms'):
+                                        for c in each['rooms'].keys():
+                                            n = ('%s:%s' % (each['name'],c)).encode('hex')
+                                            list.append({'jid':'%s@%s'%(n,chathostname),'name':'%s:%s'%(each['name'],c)})
+                                            #print list
+                    return list
+        elif to.getDomain() == chathostname:
+            if type == 'info':
+                #print 'item case', to.getNode().encode('utf-8')
+                str = unicode(to.getNode().encode('utf-8').decode('hex'),'utf-8','strict')
+                lobby,room = str.split(':')
+                #print 'str', str.encode('utf-8')
+                result = {
+                    'ids':[
+                        {'category':'conference','type':'yahoo','name':str}],
+                    'features':[NS_MUC]}
+                for node in self.catlist.keys():
+                    #print 'node=%s,lobby=%s,room=%s'%(node.encode('utf-8'), lobby, room)
+                    if self.catlist[node][1].has_key(lobby):
+                        t = self.catlist[node][1][lobby]
+                        #print 't=%s'%t
+                        data = {'muc#roominfo_description':t['name'],'muc#roominfo_subject':t['topic'],'muc#roominfo_occupants':t['rooms']['%s'%room]['users']}
+                        #print 'data=%s'%data
+                        info = DataForm(typ = 'result', data= data)
+                        field = info.setField('FORM_TYPE')
+                        field.setType('hidden')
+                        field.setValue('http://jabber.org/protocol/muc#roominfo')
+                        #print info
+                        result['xdata'] = info
+                return result
+            if type == 'items':
+                return []
 
     def xmpp_iq_discoinfo_results(self, con, event):
         discoresults[event.getFrom().getStripped().encode('utf8')]=event
-        raise dispatcher.NodeProcessed
-
-    def xmpp_iq_discoitems(self, con, event):
-        fromjid = event.getFrom()
-        to = event.getTo()
-        id = event.getID()
-        if event.getTo() == hostname:
-            m = Iq(to=fromjid,frm=to, typ='result', queryNS=NS_DISCO_ITEMS)
-            b = [Node('item',attrs={'jid':chathostname,'name':"Yahoo public chat rooms"})]
-            if userlist.has_key(fromjid.getStripped()):
-                for each in userlist[fromjid.getStripped()].roster.keys():
-                    b.append(Node('item', attrs={'jid':'%s@%s' %(each,hostname),'name':each}))
-            m.setQueryPayload(b)
-            m.setID(id)
-            self.jabberqueue(m)
-            #raise dispatcher.NodeProcessed
-        elif event.getTo().getDomain() == hostname:
-            if userlist.has_key(fromjid.getStripped()):
-                #print userlist[fromjid.getStripped()].roster
-                if userlist[fromjid.getStripped()].roster.has_key(to.getNode()):
-                    m = Iq(to=fromjid, frm=to,typ='result',queryNS=NS_DISCO_ITEMS)
-                    m.setID(id)
-                    self.jabberqueue(m)
-                else:
-                    self.jabberqueue(Error(event,ERR_NOT_ACCEPTABLE))
-            else:
-                self.jabberqueue(Error(event,ERR_NOT_ACCEPTABLE))
-        elif event.getTo() == chathostname:
-            if event.getQuerynode() == None:
-                #print self.chatcat
-                if self.chatcat[0][0] < (time.time() - (5*60)):
-                    t = roomlist.getcata(0)
-                    if t != None:
-                        for each in t.keys():
-                            self.chatcat[each] = (time.time(),t[each])
-                payload = []
-                for each in self.chatcat[0][1]:
-                    payload.append(Node('item', attrs={'jid':to,'node':each,'name':self.chatcat[0][1][each]}))
-                m = Iq(to=fromjid,frm=to, typ='result',queryNS=NS_DISCO_ITEMS,payload=payload)
-                m.setID(id)
-                self.jabberqueue(m)
-                #raise dispatcher.NodeProcessed
-            else:
-                # Do get room item
-                if not self.catlist.has_key(event.getQuerynode()):
-                    t = roomlist.getrooms(event.getQuerynode())
-                    if t != None:
-                        self.catlist[event.getQuerynode()] = (time.time(),t)
-                else:
-                    if self.catlist[event.getQuerynode()][0] < (time.time() - 5*60):
-                        t = roomlist.getrooms(event.getQuerynode())
-                        #print t
-                        if t != None:
-                            self.catlist[event.getQuerynode()] = (time.time(),t)
-                # Do get more categories
-                print event.getQuerynode().encode('utf-8')
-                if not self.chatcat.has_key(event.getQuerynode()):
-                    t = roomlist.getcata(event.getQuerynode())
-                    #print t
-                    if t != None:
-                        self.chatcat[event.getQuerynode()] = (time.time(),t)
-                else:
-                    if self.chatcat[event.getQuerynode()][0] < (time.time() - 5*60):
-                        t = roomlist.getcata(event.getQuerynode())
-                        #print t
-                        if t != None:
-                            self.chatcat[event.getQuerynode()] = (time.time(),t)
-                payload = []
-                if len(event.getQuerynode().split('/')) == 1:
-                    #add catagories first
-                    if self.chatcat.has_key(event.getQuerynode()):
-                        for each in self.chatcat[event.getQuerynode()][1].keys():
-                            payload.append(Node('item', attrs={'jid':to,'node':each,'name':self.chatcat[event.getQuerynode()][1][each]}))
-                    # First level of nodes
-                    #print self.catlist[event.getQueryNode()]
-                    for z in self.catlist[event.getQuerynode()][1].keys():
-                        each = self.catlist[event.getQuerynode()][1][z]
-                        if each.has_key('type'):
-                            if each['type'] == 'yahoo':
-                                if each.has_key('rooms'):
-                                    for c in each['rooms'].keys():
-                                        n = ('%s:%s' % (each['name'],c)).encode('hex')
-                                        payload.append(Node('item',attrs={'jid':'%s@%s'%(n,chathostname),'name':'%s:%s'%(each['name'],c)}))
-                                        #print payload
-                m = event.buildReply('result')
-                m.setQueryNS(NS_DISCO_ITEMS)
-                m.setQuerynode(event.getQuerynode())
-                m.setQueryPayload(payload)
-                self.jabberqueue(m)
-                #raise dispatcher.NodeProcessed
-        elif event.getTo().getDomain() == chathostname:
-            m = event.buildReply('result')
-            m.setQueryNS(NS_DISCO_ITEMS)
-            self.jabberqueue(m)
-        else:
-            self.jabberqueue(Error(event,ERR_FEATURE_NOT_IMPLEMENTED))
         raise dispatcher.NodeProcessed
 
     def xmpp_iq_agents(self, con, event):
