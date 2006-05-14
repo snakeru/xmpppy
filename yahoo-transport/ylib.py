@@ -201,7 +201,7 @@ class YahooCon:
                                     self.resources[pay[each][7]].remove('messenger')
                                     if self.handlers.has_key('offline'):
                                         self.handlers['offline'](self,pay[each][7])
-                    if self.resources[pay[each][7]] == []:
+                    if not self.resources.has_key(pay[each][7]) or self.resources[pay[each][7]] == []:
                         self.roster[pay[each][7]]=('unavailable', None, None)
         elif len(pay[0].keys()) == 0:
             self.handlers['closed'](self)
