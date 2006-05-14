@@ -1,8 +1,14 @@
 #! /usr/bin/env python
 # $Id$
 version = 'CVS ' + '$Revision$'.split()[1]
+#
+# Yahoo Transport
+# June 2004 Copyright (c) Mike Albon
+# 2006 Copyright (c) Norman Rasmussen
+#
+# This program is free software licensed with the GNU Public License Version 2.
+# For a full copy of the license please go here http://www.gnu.org/licenses/licenses.html#GPL
 
-# Yahoo Transport June 2004
 from xmpp import *
 from xmpp.protocol import *
 from xmpp.browser import *
@@ -15,7 +21,7 @@ import re
 import traceback
 #import dummy_threading as _threading
 
-VERSTR = 'XMPPPY Yahoo! Transport (Dev)'
+VERSTR = 'Yahoo! Transport'
 rdsocketlist = {}
 wrsocketlist = {}
 userlist = {}
