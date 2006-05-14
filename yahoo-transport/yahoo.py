@@ -830,8 +830,10 @@ class Transport:
                     timerlist.remove(yobj.confpingobj)
             except AttributeError:
                 pass
-            del userlist[yobj.fromjid]
-            del rdsocketlist[yobj.sock]
+            if userlist.has_key(yobj.fromjid):
+                del userlist[yobj.fromjid]
+            if rdsocketlist.has_key(yobj.sock):
+                del rdsocketlist[yobj.sock]
             if wrsocketlist.has_key(yobj.sock):
                 del wrsocketlist[yobj.sock]
             #yobj.sock.close()
