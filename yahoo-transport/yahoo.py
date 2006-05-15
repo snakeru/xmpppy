@@ -1247,6 +1247,16 @@ if __name__ == '__main__':
                 pass
             except socket.error:
                 trans.y_closed(rdsocketlist[each])
+            except:
+                if logfile != None:
+                    logfile.write(time.strftime('%a %d %b %Y %H:%M:%S\n'))
+                    traceback.print_exc(file=logfile)
+                    logfile.flush()
+                if fatalerrors:
+                    _pendingException = sys.exc_info()
+                    raise _pendingException[0], _pendingException[1], _pendingException[2]
+                sys.stderr.write(time.strftime('%a %d %b %Y %H:%M:%S\n'))
+                traceback.print_exc()
         #delayed execution method modified from python-irclib written by Joel Rosdahl <joel@rosdahl.net>
         for each in timerlist:
             #print int(time.time())%each[0]-each[1]
