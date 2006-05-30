@@ -2,25 +2,22 @@
 # $Id$
 version = 'CVS ' + '$Revision$'.split()[1]
 #
-# Yahoo Transport
+# Yahoo! Transport
 # June 2004 Copyright (c) Mike Albon
 # 2006 Copyright (c) Norman Rasmussen
 #
 # This program is free software licensed with the GNU Public License Version 2.
 # For a full copy of the license please go here http://www.gnu.org/licenses/licenses.html#GPL
 
-from xmpp import *
+import base64, ConfigParser, os, platform, re, select, sha, shelve, signal, socket, sys, time, traceback
+from curphoo import cpformat
 from xmpp.protocol import *
 from xmpp.browser import *
 from xmpp.commands import *
-from xmpp.simplexml import Node
-from curphoo import cpformat
-import ConfigParser, sys, time, select, shelve, ylib, os, platform, roomlist, sha, base64, socket
-from toolbox import *
 from xmpp.jep0106 import *
-import re
-import traceback
-#import dummy_threading as _threading
+import config, roomlist, xmlconfig, ylib
+from jep0133 import *
+from toolbox import *
 
 VERSTR = 'Yahoo! Transport'
 rdsocketlist = {}
@@ -50,20 +47,12 @@ def connectxmpp(handlerreg):
         #print "auth return",connected
     return connected
 
-def fromyahoo(userstr):
-    return userstr.replace('@','%')
-
-def toyahoo(userstr):
-    return userstr.replace('%','@')
-
 roomenccodere = re.compile('([^-]?)([A-Z-])')
 def RoomEncode(userstr):
-    #return userstr.encode('hex')
     return JIDEncode(roomenccodere.sub('\\1-\\2', userstr))
 
 roomdeccodere = re.compile('-([a-zA-Z-])')
 def RoomDecode(userstr):
-    #return userstr.decode('hex')
     def decode(m):
         return m.group(1).upper()
     return roomdeccodere.sub(decode, JIDDecode(userstr))
@@ -71,7 +60,6 @@ def RoomDecode(userstr):
 class Transport:
     def __init__(self,jabber):
         self.jabber = jabber
-        #self.register_handlers()
         self.chatcat = {0:(0,{})}
         self.catlist = {}
 
@@ -115,8 +103,6 @@ class Transport:
         self.jabber.RegisterHandler('presence',self.xmpp_presence)
         self.jabber.RegisterHandler('iq',self.xmpp_iq_discoinfo_results,typ = 'result', ns=NS_DISCO_INFO)
         self.jabber.RegisterHandler('iq',self.xmpp_iq_version,typ = 'get', ns=NS_VERSION)
-        self.jabber.RegisterHandler('iq',self.xmpp_iq_agents,typ = 'get', ns=NS_AGENTS)
-        self.jabber.RegisterHandler('iq',self.xmpp_iq_browse,typ = 'get', ns=NS_BROWSE)
         self.jabber.RegisterHandler('iq',self.xmpp_iq_register_get, typ = 'get', ns=NS_REGISTER)
         self.jabber.RegisterHandler('iq',self.xmpp_iq_register_set, typ = 'set', ns=NS_REGISTER)
         self.jabber.RegisterHandler('iq',self.xmpp_iq_avatar, typ = 'get', ns='jabber:iq:avatar')
@@ -635,12 +621,6 @@ class Transport:
         discoresults[event.getFrom().getStripped().encode('utf8')]=event
         raise dispatcher.NodeProcessed
 
-    def xmpp_iq_agents(self, con, event):
-        m = Iq(to=event.getFrom(), frm=event.getTo(), typ='result', payload=[Node('agent', attrs={'jid':hostname},payload=[Node('service',payload='yahoo'),Node('name',payload=VERSTR),Node('groupchat')])])
-        m.setID(event.getID())
-        self.jabberqueue(m)
-        raise dispatcher.NodeProcessed
-
     def xmpp_iq_register_get(self, con, event):
         if event.getTo() == hostname:
             username = []
@@ -1074,18 +1054,6 @@ class Transport:
                 jid.setResource(userlist[fromjid].chatresource)
                 self.jabberqueue(Presence(frm = '%s@%s/%s' % (RoomEncode(room),chathostname,nick), to= jid, typ = 'unavailable'))
 
-    def xmpp_iq_browse(self, con, event):
-        m = Iq(to = event.getFrom(), frm = event.getTo(), typ = 'result', queryNS = NS_BROWSE)
-        if event.getTo() == hostname:
-            #m.setTagAttr('query','catagory','conference')
-            #m.setTagAttr('query','name','xmpp Yahoo Transport')
-            #m.setTagAttr('query','type','yahoo')
-            #m.setTagAttr('query','jid','hostname')
-            m.setPayload([Node('service',attrs = {'type':'yahoo','name':'xmpp Yahoo Transport','jid':hostname},payload=[Node('ns',payload=NS_MUC),Node('ns',payload=NS_REGISTER)])])
-        m.setID(event.getID())
-        self.jabberqueue(m)
-        raise dispatcher.NodeProcessed
-
     def xmpp_iq_version(self, con, event):
         fromjid = event.getFrom()
         to = event.getTo()
@@ -1148,7 +1116,7 @@ if __name__ == '__main__':
         fatalerrors = configfile.get('yahoo','FatalErrors').lower() in ['true', '1', 'yes']
 
     global connection
-    connection = client.Component(hostname,port,component=component,domains=[hostname,chathostname])
+    connection = xmpp.client.Component(hostname,port,component=component,domains=[hostname,chathostname])
     trans = Transport(connection)
     if not connectxmpp(trans.register_handlers):
         print "Could not connect to server, or password mismatch!"
@@ -1164,30 +1132,6 @@ if __name__ == '__main__':
         except socket.error:
             print "Bad Socket", rdsocketlist, wrsocketlist
             trans.findbadconn()
-##            for each in rdsocketlist.keys():
-##                try:
-##                    (ii,io,ie) = select.select([each],[],[])
-##                except ValueError:
-##                    try:
-##                        if rdsocketlist[each] != 'xmpp':
-##                            trans.y_closed(rdsocketlist[each])
-##                        else:
-##                            print "We shouldn't get a bad xmpp socket here"
-##                    except KeyError:
-##                        print "badconn"
-##                        trans.findbadconn()
-##            for each in wrsocketlist.keys():
-##                try:
-##                    (ii,io,ie) = select.select([],[each],[])
-##                except ValueError:
-##                    try:
-##                        if rdsocketlist[each] != 'xmpp':
-##                            trans.y_closed(rdsocketlist[each])
-##                        else:
-##                            print "We shouldn't get a bad xmpp socket here"
-##                    except KeyError:
-##                        print "badconn"
-##                        trans.findbadconn()
         for each in i:
             if rdsocketlist[each] == 'xmpp':
                 try:
