@@ -527,7 +527,6 @@ class Transport:
                 raise NodeProcessed
         elif to.getDomain() == hostname:
             if userlist.has_key(fromstripped):
-                #print userlist[fromstripped].roster
                 if type == 'info':
                     if userlist[fromstripped].roster.has_key(to.getNode()):
                         features = []
@@ -567,7 +566,6 @@ class Transport:
                     return list
             else:
                 if type == 'info':
-                    #print 'catagory item case ',self.chatcat[0][1]
                     if self.chatcat[0][1].has_key(node):
                         return {
                             'ids':[
@@ -582,20 +580,16 @@ class Transport:
                     else:
                         if self.catlist[node][0] < (time.time() - 5*60):
                             t = roomlist.getrooms(node)
-                            #print t
                             if t != None:
                                 self.catlist[node] = (time.time(),t)
                     # Do get more categories
-                    #print node.encode('utf-8')
                     if not self.chatcat.has_key(node):
                         t = roomlist.getcata(node)
-                        #print t
                         if t != None:
                             self.chatcat[node] = (time.time(),t)
                     else:
                         if self.chatcat[node][0] < (time.time() - 5*60):
                             t = roomlist.getcata(node)
-                            #print t
                             if t != None:
                                 self.chatcat[node] = (time.time(),t)
                     list = []
@@ -606,7 +600,6 @@ class Transport:
                                 if each != 0 and 0 in self.chatcat[node][1].keys():
                                     list.append({'jid':to,'node':each,'name':self.chatcat[node][1][0][each]})
                         # First level of nodes
-                        #print self.catlist[node]
                         for z in self.catlist[node][1].keys():
                             each = self.catlist[node][1][z]
                             if each.has_key('type'):
@@ -615,31 +608,25 @@ class Transport:
                                         for c in each['rooms'].keys():
                                             n = RoomEncode('%s:%s' % (each['name'],c))
                                             list.append({'jid':'%s@%s'%(n,chathostname),'name':'%s:%s'%(each['name'],c)})
-                                            #print list
                     return list
         elif to.getDomain() == chathostname:
             if type == 'info':
-                #print 'item case', to.getNode().encode('utf-8')
                 str = unicode(RoomDecode(to.getNode().encode('utf-8')),'utf-8','strict')
                 lobby,room = str.split(':')
-                #print 'str', str.encode('utf-8')
                 result = {
                     'ids':[
                         {'category':'conference','type':'yahoo','name':str}],
                     'features':[NS_MUC]}
                 for node in self.catlist.keys():
-                    #print 'node=%s,lobby=%s,room=%s'%(node.encode('utf-8'), lobby, room)
                     if self.catlist[node][1].has_key(lobby):
                         t = self.catlist[node][1][lobby]
-                        #print 't=%s'%t
-                        data = {'muc#roominfo_description':t['name'],'muc#roominfo_subject':t['topic'],'muc#roominfo_occupants':t['rooms']['%s'%room]['users']}
-                        #print 'data=%s'%data
-                        info = DataForm(typ = 'result', data= data)
-                        field = info.setField('FORM_TYPE')
-                        field.setType('hidden')
-                        field.setValue('http://jabber.org/protocol/muc#roominfo')
-                        #print info
-                        result['xdata'] = info
+                        if t['rooms'].hex_key(room):
+                            data = {'muc#roominfo_description':t['name'],'muc#roominfo_subject':t['topic'],'muc#roominfo_occupants':t['rooms'][room]['users']}
+                            info = DataForm(typ = 'result', data= data)
+                            field = info.setField('FORM_TYPE')
+                            field.setType('hidden')
+                            field.setValue('http://jabber.org/protocol/muc#roominfo')
+                            result['xdata'] = info
                 return result
             if type == 'items':
                 return []
