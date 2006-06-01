@@ -577,7 +577,12 @@ class Transport:
                     list = []
                     if len(nodeinfo) == 1:
                         for each in userfile.keys():
-                            list.append({'node':'/'.join([NODE_ADMIN_REGISTERED_USERS, each]),'name':each,'jid':config.jid})
+                            #list.append({'node':'/'.join([NODE_ADMIN_REGISTERED_USERS, each]),'name':each,'jid':config.jid})
+                            list.append({'name':each,'jid':each})
+                    #elif len(nodeinfo) == 2:
+                        #fromjid = nodeinfo[1]
+                        #list = [
+                            #{'name':fromjid + ' JID','jid':fromjid}]
                     return list
             elif node.startswith(NODE_ADMIN_ONLINE_USERS):
                 if type == 'info':
@@ -589,7 +594,12 @@ class Transport:
                     list = []
                     if len(nodeinfo) == 1:
                         for each in userlist.keys():
-                            list.append({'node':'/'.join([NODE_ADMIN_ONLINE_USERS, each]),'name':each,'jid':config.jid})
+                            #list.append({'node':'/'.join([NODE_ADMIN_ONLINE_USERS, each]),'name':each,'jid':config.jid})
+                            list.append({'name':each,'jid':each})
+                    #elif len(nodeinfo) == 2:
+                        #fromjid = nodeinfo[1]
+                        #list = [
+                            #{'name':fromjid + ' JID','jid':fromjid}]
                     return list
             else:
                 self.jabber.send(Error(event,ERR_ITEM_NOT_FOUND))
@@ -1188,8 +1198,8 @@ def logError():
     sys.exc_clear()
 
 def sigHandler(signum, frame):
-    #trans.offlinemsg = 'Signal handler called with signal %s'%signum
-    trans.online = 0
+    #transport.offlinemsg = 'Signal handler called with signal %s'%signum
+    transport.online = 0
 
 if __name__ == '__main__':
     if 'PID' in os.environ:
