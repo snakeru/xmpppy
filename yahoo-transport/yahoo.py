@@ -76,7 +76,7 @@ class Connect_Registered_Users_Command(xmpp.commands.Command_Handler_Prototype):
                         conn.send(Presence(to=each, frm = '%s@%s'%(server,config.jid), typ = 'probe'))
             reply = request.buildReply('result')
             form = DataForm(typ='result',data=[DataField(value='Command completed.',typ='fixed')])
-            reply.addChild(name='command',attrs={'xmlns':NS_COMMAND,'node':request.getTagAttr('command','node'),'sessionid':self.getSessionID(),'status':'completed'},payload=[form])
+            reply.addChild(name='command',namespace=NS_COMMAND,attrs={'node':request.getTagAttr('command','node'),'sessionid':self.getSessionID(),'status':'completed'},payload=[form])
             self._owner.send(reply)
         else:
             self._owner.send(Error(request,ERR_FORBIDDEN))
@@ -985,7 +985,7 @@ class Transport:
             if userfile[yobj.fromjid].has_key('avatar'):
                 print userfile[yobj.fromjid]['avatar'].keys(), name
                 if userfile[yobj.fromjid]['avatar'].has_key(name):
-                    b.addChild(node=Node('x',attrs={'xmlns':'jabber:x:avatar'},payload=[Node('hash',payload=userfile[yobj.fromjid]['avatar'][name][0])]))
+                    b.addChild(node=Node('x',namespace='jabber:x:avatar',payload=[Node('hash',payload=userfile[yobj.fromjid]['avatar'][name][0])]))
             self.jabberqueue(b)
 
     def y_chatonline(self,yobj, name):
