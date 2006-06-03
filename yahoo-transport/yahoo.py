@@ -1211,17 +1211,17 @@ if __name__ == '__main__':
         pidfile.close()
 
     if config.saslUsername:
-        component = 1
+        sasl = 1
     else:
         config.saslUsername = config.jid
-        component = 0
+        sasl = 0
 
     userfile = shelve.open(config.spoolFile)
     logfile = None
     if config.debugFile:
         logfile = open(config.debugFile,'a')
 
-    connection = xmpp.client.Component(config.jid,config.port,component=component,domains=[config.jid,config.confjid])
+    connection = xmpp.client.Component(config.jid,config.port,domains=[config.jid,config.confjid],sasl=sasl,bind=config.useComponentBinding,route=config.useRouteWrap)
     transport = Transport(connection)
     if not transport.xmpp_connect():
         print "Could not connect to server, or password mismatch!"
