@@ -985,7 +985,7 @@ class Transport:
             if userfile[yobj.fromjid].has_key('avatar'):
                 print userfile[yobj.fromjid]['avatar'].keys(), name
                 if userfile[yobj.fromjid]['avatar'].has_key(name):
-                    b.addChild(node=Node('x',namespace='jabber:x:avatar',payload=[Node('hash',payload=userfile[yobj.fromjid]['avatar'][name][0])]))
+                    b.addChild(node=Node('jabber:x:avatar x',payload=[Node('hash',payload=userfile[yobj.fromjid]['avatar'][name][0])]))
             self.jabberqueue(b)
 
     def y_chatonline(self,yobj, name):
