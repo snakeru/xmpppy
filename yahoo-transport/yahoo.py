@@ -1184,7 +1184,7 @@ def loadConfig():
             xmlconfig.reloadConfig(configFile, configOptions)
             config.configFile = configFile
             return
-    print "Configuration file not found. You need to create a config file and put it in one of these locations:\n    " + "\n    ".join(configFiles)
+    print "Configuration file not found. You need to create a config file and put it in one of these locations:\n    " + "\n    ".join(config.configFiles)
     sys.exit(1)
 
 def logError():
