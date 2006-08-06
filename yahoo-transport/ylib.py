@@ -139,7 +139,7 @@ class YahooCon:
                         elif pay[each][47] == '2':
                             typ = 'away'
                     self.roster[pay[each][7]]=('available', typ, status)
-                    if pay[each].has_key(213):
+                    if pay[each].has_key(213) and pay[each].has_key(197):
                         if pay[each][213] == '1':
                             b = avatar.getavatar(pay[each][197])
                             if b != None and self.handlers.has_key('avatar'):
