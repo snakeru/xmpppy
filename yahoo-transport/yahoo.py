@@ -424,8 +424,10 @@ class Transport:
                                     timerlist.remove(yobj.pripingobj)
                                 if yobj.secpingobj in timerlist:
                                     timerlist.remove(yobj.secpingobj)
-                                del userlist[yobj.fromjid]
-                                del rdsocketlist[yobj.sock]
+                                if userlist.has_key(yobj.fromjid):
+                                    del userlist[yobj.fromjid]
+                                if rdsocketlist.has_key(yobj.sock):
+                                    del rdsocketlist[yobj.sock]
                                 yobj.sock.close()
                                 del yobj
                     else:
