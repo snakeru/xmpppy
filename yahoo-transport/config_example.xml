@@ -63,4 +63,7 @@
     <!-- The file to log to. Leave this disabled for stdout only -->
     <debugFile>yahooerror.log</debugFile>
 
+    <!-- Show the raw data being sent and received from the xmpp and yahoo servers -->
+    <!--<dumpProtocol/>-->
+
 </pyyimt>

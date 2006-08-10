@@ -25,3 +25,5 @@ useRouteWrap = False
 saslUsername = ""
 
 debugFile = ""
+
+dumpProtocol = False

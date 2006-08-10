@@ -9,6 +9,10 @@ import re
 import random
 
 
+def printpacket(packet):
+    s,u = ymsg_dehdr(packet)
+    t = ymsg_deargu(u[:s[2]])
+    print 'send', s, t, len(packet)
 
 
 # Yahoo Functions
@@ -32,7 +36,7 @@ class YahooCon:
     # login -- on sucessful login
     # loginfail -- on login failure
 
-    def __init__(self, username, password, fromjid,fromhost):
+    def __init__(self, username, password, fromjid,fromhost,dumpProtocol):
         self.username = username
         self.password = password
         self.fromhost = fromhost
@@ -54,6 +58,7 @@ class YahooCon:
         self.resources = {}
         self.xresources = {}
         self.offset = int(random.random()*len(self.hostlist))
+        self.dumpProtocol = dumpProtocol
 
     # utility methods
     def connect(self):
@@ -323,6 +328,12 @@ class YahooCon:
                     if self.handlers.has_key('chatmessage'):
                         self.handlers['chatmessage'](self,pay[each][4], msg)
 
+    def ymsg_notify(self, hdr, pay):
+        for each in pay.keys():
+            if pay[each].has_key(13):
+                if self.handlers.has_key('notify'):
+                    self.handlers['notify'](self,pay[each][4],pay[each][13]=='1')
+
     def ymsg_ping(self, hdr, pay):
         #print "got lib ping"
         self.secpingtime = 13
@@ -514,6 +525,11 @@ class YahooCon:
         hdr = ymsg_mkhdr(self.version,len(pay), Y_confpm,status,self.session)
         return hdr+pay
 
+    def ymsg_send_notify(self, nick, state):
+        pay = ymsg_mkargu({49:'TYPING', 1:self.username,14:' ',13:state, 5:nick,1002:'1',})
+        hdr = ymsg_mkhdr(self.version,len(pay), Y_notify,0,self.session)
+        return hdr+pay
+
     def ymsg_send_priping(self):
         if time.time() - self.pripingtime > 10:
             pay = ymsg_mkargu({109:self.username})
@@ -644,7 +660,7 @@ class YahooCon:
                     print "Broken connection Terminating"
                     if self.handlers.has_key('closed'):
                         self.handlers['closed'](self)
-                print s, t, len(self.rbuf)
+                if self.dumpProtocol: print 'recv', s, t, len(self.rbuf)
                 if s[3] == Y_chalreq:           #87
                     # give salt
                     self.sock.send(self.ymsg_challenge(s,t))
@@ -668,6 +684,8 @@ class YahooCon:
                     self.ymsg_msg(s,t)
                 elif s[3] == Y_confpm:      #32
                     self.ymsg_msg(s,t)
+                elif s[3] == Y_notify:      #75
+                    self.ymsg_notify(s,t)
                 elif s[3] == Y_ping2:       #18
                     self.ymsg_ping(s,t)
                 elif s[3] == Y_ping:        #161
@@ -709,7 +727,7 @@ class YahooCon:
                 break
 
 if __name__ == '__main__':
-    y = YahooCon('YID','password','jid','')
+    y = YahooCon('YID','password','jid','',True)
     while not y.connect():
         print 'sleep'
         time.sleep(5)
