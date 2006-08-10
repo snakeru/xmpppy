@@ -204,7 +204,8 @@ class YahooCon:
                     if not self.resources.has_key(pay[each][7]) or self.resources[pay[each][7]] == []:
                         self.roster[pay[each][7]]=('unavailable', None, None)
         elif len(pay[0].keys()) == 0:
-            self.handlers['closed'](self)
+            if self.handlers.has_key('closed'):
+                self.handlers['closed'](self)
 
     def ymsg_notification(self,hdr,pay):
         if pay[0].has_key(20):
@@ -215,7 +216,8 @@ class YahooCon:
             desc = pay[0][14]
         else:
             desc = None
-        self.handlers['calendar'](self,url,desc)
+        if self.handlers.has_key('calendar'):
+            self.handlers['calendar'](self,url,desc)
 
     def ymsg_email(self,hdr,pay):
         if pay[0].has_key(43):
@@ -231,7 +233,8 @@ class YahooCon:
         else:
             subj = None
         if subj != None or fromaddr != None or fromtxt != None:
-            self.handlers['email'](self,fromtxt,fromaddr,subj)
+            if self.handlers.has_key('email'):
+                self.handlers['email'](self,fromtxt,fromaddr,subj)
 
     def ymsg_away(self,hdr,pay):
         if pay[0].has_key(10):
@@ -268,7 +271,8 @@ class YahooCon:
                     typ = "away"
             if pay[0].has_key(7):
                 self.roster[pay[0][7]]=("available",typ,status)
-                self.handlers['online'](self,pay[0][7])
+                if self.handlers.has_key('online'):
+                    self.handlers['online'](self,pay[0][7])
 
     def ymsg_back(self,hdr,pay):
         if pay[0].has_key(19):
@@ -283,7 +287,8 @@ class YahooCon:
                 typ = 'away'
         if pay[0].has_key(7):
             self.roster[pay[0][7]]=('available',typ,status)
-            self.handlers['online'](self,pay[0][7])
+            if self.handlers.has_key('online'):
+                self.handlers['online'](self,pay[0][7])
 
 
     def ymsg_roster(self,hdr,pay):
@@ -309,11 +314,14 @@ class YahooCon:
                     msg = pay[each][14]
                 if hdr[3] == Y_msg:
                     if hdr[4] == 2:
-                        self.handlers['messagefail'](self, pay[each][4], msg)
+                        if self.handlers.has_key('messagefail'):
+                            self.handlers['messagefail'](self, pay[each][4], msg)
                     else:
-                        self.handlers['message'](self, pay[each][4], msg)
+                        if self.handlers.has_key('message'):
+                            self.handlers['message'](self, pay[each][4], msg)
                 if hdr[3] == Y_confpm:
-                    self.handlers['chatmessage'](self,pay[each][4], msg)
+                    if self.handlers.has_key('chatmessage'):
+                        self.handlers['chatmessage'](self,pay[each][4], msg)
 
     def ymsg_ping(self, hdr, pay):
         #print "got lib ping"
@@ -336,7 +344,7 @@ class YahooCon:
             self.handlers['reqroom'](self.fromjid)
 
     def ymsg_conflogon(self,hdr,pay):
-        if self.handlers['conflogon']:
+        if self.handlers.has_key('conflogon'):
             self.handlers['conflogon']()
 
     def ymsg_joinroom(self,hdr,pay):
@@ -399,9 +407,11 @@ class YahooCon:
             else:
                 msg = pay[0][117]
             if hdr[4] == 1:
-                self.handlers['roommessage'](self, pay[0][109], pay[0][104], msg)
+                if self.handlers.has_key('roommessage'):
+                    self.handlers['roommessage'](self, pay[0][109], pay[0][104], msg)
             elif hdr[4] == 2:
-                self.handlers['roommessagefail'](self, pay[0][109], pay[0][104], msg)
+                if self.handlers.has_key('roommessagefail'):
+                    self.handlers['roommessagefail'](self, pay[0][109], pay[0][104], msg)
 
     def ymsg_init(self):
         try:
@@ -593,22 +603,22 @@ class YahooCon:
             if pay[0][66] == '3':
                 #Bad username case
                 if self.handlers.has_key('loginfail'):
-                        self.handlers['loginfail'](self,'badusername')
+                    self.handlers['loginfail'](self,'badusername')
             elif pay[0][66] == '13':
                 #Bad password case
                 if self.handlers.has_key('loginfail'):
-                        self.handlers['loginfail'](self,'badpassword')
+                    self.handlers['loginfail'](self,'badpassword')
             elif pay[0][66] == '29':
                 #Account requires image verify
                 if self.handlers.has_key('loginfail'):
-                        self.handlers['loginfail'](self,'imageverify')
+                    self.handlers['loginfail'](self,'imageverify')
             elif pay[0][66] == '14':
                 #Account locked
                 if self.handlers.has_key('loginfail'):
-                        self.handlers['loginfail'](self,'locked')
+                    self.handlers['loginfail'](self,'locked')
             else:
                 if self.handlers.has_key('loginfail'):
-                        self.handlers['loginfail'](self)
+                    self.handlers['loginfail'](self)
 
     def Process(self):
         r = self.sock.recv(1024)
@@ -618,19 +628,22 @@ class YahooCon:
             #print len(self.rbuf)
         else:
             # Broken Socket Case.
-            self.handlers['closed'](self)
+            if self.handlers.has_key('closed'):
+                self.handlers['closed'](self)
         while len(self.rbuf) >= 20:
             s,u = ymsg_dehdr(self.rbuf)
             if s[0] != 'YMSG':
-                self.handlers['closed'](self)
+                if self.handlers.has_key('closed'):
+                    self.handlers['closed'](self)
             size = 20+s[2]
             #print size, len(self.rbuf)
             if len(self.rbuf) >= size:
-            	try:
-                	t = ymsg_deargu(u[:s[2]])
+                try:
+                    t = ymsg_deargu(u[:s[2]])
                 except:
-                	print "Broken connection Terminating"
-                	self.handlers['closed'](self)
+                    print "Broken connection Terminating"
+                    if self.handlers.has_key('closed'):
+                        self.handlers['closed'](self)
                 print s, t, len(self.rbuf)
                 if s[3] == Y_chalreq:           #87
                     # give salt
