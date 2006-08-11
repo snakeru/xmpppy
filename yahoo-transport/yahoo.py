@@ -103,6 +103,8 @@ class Transport:
         self.catlist = {}
 
     def jabberqueue(self,packet):
+        if not wrsocketlist.has_key(self.jabber.Connection._sock):
+            wrsocketlist[self.jabber.Connection._sock]=[]
         wrsocketlist[self.jabber.Connection._sock].append(packet)
 
     def yahooqueue(self,fromjid,packet):
@@ -1209,6 +1211,8 @@ class Transport:
             yobj.sock.close()
             del yobj
         del rdsocketlist[self.jabber.Connection._sock]
+        if wrsocketlist.has_key(self.jabber.Connection._sock):
+            del wrsocketlist[self.jabber.Connection._sock]
         time.sleep(5)
         while not self.jabber.reconnectAndReauth():
             time.sleep(5)
@@ -1271,7 +1275,6 @@ if __name__ == '__main__':
     signal.signal(signal.SIGINT, sigHandler)
     signal.signal(signal.SIGTERM, sigHandler)
     rdsocketlist[connection.Connection._sock]='xmpp'
-    wrsocketlist[connection.Connection._sock]=[]
     while transport.online:
         #print 'poll',rdsocketlist
         try:
@@ -1308,10 +1311,8 @@ if __name__ == '__main__':
                     packet = wrsocketlist[each].pop(0)
                     if config.dumpProtocol: ylib.printpacket(packet)
                     each.send(packet)
-                    if wrsocketlist[each] == []:
-                        del wrsocketlist[each]
-            except KeyError:
-                pass
+                if wrsocketlist[each] == []:
+                    del wrsocketlist[each]
             except socket.error:
                 transport.y_closed(rdsocketlist[each])
             except:
