@@ -1277,14 +1277,15 @@ if __name__ == '__main__':
         #print 'poll',rdsocketlist
         try:
             (i , o, e) = select.select(rdsocketlist.keys(),wrsocketlist.keys(),[],1)
-        except ValueError:
-            print "Value Error", rdsocketlist, wrsocketlist
-            logError()
-            transport.findbadconn()
         except socket.error:
             print "Bad Socket", rdsocketlist, wrsocketlist
             logError()
             transport.findbadconn()
+            sys.exc_clear()
+            (i , o, e) = select.select(rdsocketlist.keys(),wrsocketlist.keys(),[],1)
+        except select.error:
+            sys.exc_clear()
+            (i , o, e) = select.select(rdsocketlist.keys(),wrsocketlist.keys(),[],1)
         for each in i:
             #print 'reading',each,rdsocketlist.has_key(each)
             if rdsocketlist.has_key(each):
@@ -1338,10 +1339,11 @@ if __name__ == '__main__':
     for each in [x for x in userlist.keys()]:
         userlist[each].connok = True
         transport.y_send_offline(each, status = transport.offlinemsg)
-    while wrsocketlist[connection.Connection._sock] != []:
-        connection.send(wrsocketlist[connection.Connection._sock].pop(0))
     del rdsocketlist[connection.Connection._sock]
-    del wrsocketlist[connection.Connection._sock]
+    if wrsocketlist.has_key(connection.Connection._sock):
+        while wrsocketlist[connection.Connection._sock] != []:
+            connection.send(wrsocketlist[connection.Connection._sock].pop(0))
+        del wrsocketlist[connection.Connection._sock]
     userfile.close()
     connection.disconnect()
     if config.pid:
