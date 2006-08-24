@@ -665,7 +665,7 @@ class YahooCon:
                 if self.dumpProtocol: print 'recv', s, t, len(self.rbuf)
                 if s[3] == Y_chalreq:           #87
                     # give salt
-                    challenge = self.ymsg_challenge(s,t))
+                    challenge = self.ymsg_challenge(s,t)
                     if self.dumpProtocol: printpacket(challenge)
                     self.sock.send(challenge)
                 elif s[3] == Y_login:           #85
