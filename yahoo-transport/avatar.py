@@ -1,9 +1,9 @@
 import httplib
 
-def getavatar(aid):
+def getavatar(aid, debug):
     #the aid value is the Avatar ID. This is given in tag 197
     conn = httplib.HTTPConnection("img1.avatar.vip.dcn.yahoo.com")
-    conn.debuglevel=3
+    if debug: conn.debuglevel=3
     conn.request("GET","/users/%s.medium.png"%aid)
     try:
         r1 = conn.getresponse()

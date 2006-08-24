@@ -117,7 +117,7 @@ class Transport:
     def findbadconn(self):
         #print rdsocketlist
         for each in userlist:
-            print each, userlist[each].sock.fileno()
+            if config.dumpProtocol: print each, userlist[each].sock.fileno()
             if userlist[each].sock.fileno() == -1:
                 #print each, userlist[each].sock.fileno()
                 self.y_closed(userlist[each])
@@ -259,7 +259,7 @@ class Transport:
                             room = userlist[fromstripped].roomnames[yid.lower()].encode('utf-8')
                         else:
                             room = None
-                        print "groupchat room: ",room
+                        if config.dumpProtocol: print "groupchat room: ",room
                         if room != None:
                             if event.getBody()[0:3] == '/me':
                                 type = 2
@@ -273,7 +273,7 @@ class Transport:
                         else:
                             self.jabberqueue(Error(event,ERR_BAD_REQUEST))
             else:
-                print 'no item error'
+                if config.dumpProtocol: print 'no item error'
                 self.jabberqueue(Error(event,ERR_REGISTRATION_REQUIRED))
         else:
             self.jabberqueue(Error(event,ERR_BAD_REQUEST))
@@ -307,12 +307,12 @@ class Transport:
                                 p=None
                                 p= m.setTag('x',namespace = NS_ROSTERX)
                                 yrost = userlist[fromstripped].buddylist
-                                print yrost
+                                if config.dumpProtocol: print yrost
                                 for each in yrost.keys():
                                     for yid in yrost[each]:
                                         p.addChild(name='item', attrs={'jid':'%s@%s'%(YIDEncode(yid),config.jid),'name':yid, 'action':'add'},payload=[Node('group',payload=each)])
                                 self.jabberqueue(m)
-                                print m
+                                if config.dumpProtocol: print m
                             else:
                                 for each in userlist[fromstripped].buddylist.keys():
                                     for yid in userlist[fromstripped].buddylist[each]:
@@ -338,7 +338,7 @@ class Transport:
                         else:
                             #add new user case.
                             if event.getStatus() != None:
-                                print event.getStatus().encode('utf-8')
+                                if config.dumpProtocol: print event.getStatus().encode('utf-8')
                                 status = event.getStatus().encode('utf-8')
                             else:
                                 status = ''
@@ -370,11 +370,11 @@ class Transport:
                         if userlist[fromstripped].xresources.has_key(event.getFrom().getResource()):
                             #update resource record
                             userlist[fromstripped].xresources[event.getFrom().getResource()]=(event.getShow(),event.getPriority(),event.getStatus(),userlist[fromstripped].xresources[event.getFrom().getResource()][3])
-                            print "Update resource login: %s" % userlist[fromstripped].xresources
+                            if config.dumpProtocol: print "Update resource login: %s" % userlist[fromstripped].xresources
                         else:
                             #new resource login
                             userlist[fromstripped].xresources[event.getFrom().getResource()]=(event.getShow(),event.getPriority(),event.getStatus(),time.time())
-                            print "New resource login: %s" % userlist[fromstripped].xresources
+                            if config.dumpProtocol: print "New resource login: %s" % userlist[fromstripped].xresources
                             #send roster as is
                             self.y_send_online(fromstripped,event.getFrom().getResource())
                         #print fromstripped, event.getShow().encode('utf-8'), event.getStatus().encode('utf-8')
@@ -423,7 +423,7 @@ class Transport:
                             #Single resource case
                             #print userlist[fromstripped].xresources
                             if userlist[fromstripped].xresources == {}:
-                                print 'No more resource logins'
+                                if config.dumpProtocol: print 'No more resource logins'
                                 yobj=userlist[fromstripped]
                                 if yobj.pripingobj in timerlist:
                                     timerlist.remove(yobj.pripingobj)
@@ -444,7 +444,7 @@ class Transport:
                 #Need to move Chatpings into this section for Yahoo rooms.
                 if userlist.has_key(fromstripped):
                     if userlist[fromstripped].connok:
-                        print "chat presence"
+                        if config.dumpProtocol: print "chat presence"
                         userlist[fromstripped].roomnames[yid.lower()] = yid
                         if event.getType() == 'available' or event.getType() == None or event.getType() == '':
                             nick = event.getTo().getResource()
@@ -775,10 +775,10 @@ class Transport:
                 if not userlist.has_key(fromjid):
                     yobj = ylib.YahooCon(username.encode('utf-8'),password.encode('utf-8'), fromjid,config.host,config.dumpProtocol)
                     userlist[fromjid]=yobj
-                    print "try connect"
+                    if config.dumpProtocol: print "try connect"
                     s = yobj.connect()
                     if s != None:
-                        print "conect made"
+                        if config.dumpProtocol: print "conect made"
                         rdsocketlist[s]=yobj
                         userlist[fromjid]=yobj
                         self.yahooqueue(fromjid,yobj.ymsg_send_challenge())
@@ -898,7 +898,7 @@ class Transport:
             del yobj
 
     def y_ping(self, yobj):
-        print "got ping!"
+        if config.dumpProtocol: print "got ping!"
         #freq = yobj.pripingtime*60
         freq = 5 * 60 #overide to ping time to try and reduce disconnects
         offset = int(time.time())%freq
@@ -925,11 +925,11 @@ class Transport:
             self.jabberqueue(Message(to=yobj.fromjid,frm=config.jid,subject='Yahoo! login name',body='Your Yahoo! username was specified incorrectly in the configuration. This may be because of an upgrade from a previous version, the configuration has been updated'))
 
     def y_login(self,yobj):
-        print "got login"
+        if config.dumpProtocol: print "got login"
 
     def y_loginfail(self,yobj, reason = None):
-        print "got login fail: ",reason
-        print yobj.conncount, yobj.moreservers()
+        if config.dumpProtocol: print "got login fail: ",reason
+        if config.dumpProtocol: print yobj.conncount, yobj.moreservers()
         if yobj.moreservers() and reason == None:
             if rdsocketlist.has_key(yobj.sock):
                 del rdsocketlist[yobj.sock]
@@ -993,10 +993,10 @@ class Transport:
                 status = stripformatting(yobj.roster[yid][2])
             else:
                 status = None
-            print status
+            if config.dumpProtocol: print status
             b = Presence(to = mjid, frm = '%s@%s/messenger'%(YIDEncode(yid), config.jid),priority = 10, show=yobj.roster[yid][1], status=status)
             if userfile[yobj.fromjid].has_key('avatar'):
-                print userfile[yobj.fromjid]['avatar'].keys(), yid
+                if config.dumpProtocol: print userfile[yobj.fromjid]['avatar'].keys(), yid
                 if userfile[yobj.fromjid]['avatar'].has_key(yid):
                     b.addChild(node=Node('jabber:x:avatar x',payload=[Node('hash',payload=userfile[yobj.fromjid]['avatar'][yid][0])]))
             self.jabberqueue(b)
@@ -1073,14 +1073,14 @@ class Transport:
 
     def y_reg_login(self,yobj):
         # registration login handler
-        print "got reg login"
+        if config.dumpProtocol: print "got reg login"
         #m = yobj.event.buildReply('result')
         #self.jabberqueue(m)
         self.jabberqueue(Presence(to=yobj.event.getFrom(),frm=yobj.event.getTo(),typ=yobj.event.getType()))
         self.jabberqueue(Presence(typ='subscribe',to=yobj.fromjid, frm=config.jid))
 
     def y_reg_loginfail(self,yobj,reason = None):
-        print "got reg login fail: ",reason
+        if config.dumpProtocol: print "got reg login fail: ",reason
         if yobj.moreservers() and reason != None:
             if rdsocketlist.has_key(yobj.sock):
                 del rdsocketlist[yobj.sock]
@@ -1104,7 +1104,7 @@ class Transport:
         del yobj
 
     def y_send_online(self,fromjid,resource=None):
-        print fromjid,userlist[fromjid].roster
+        if config.dumpProtocol: print fromjid,userlist[fromjid].roster
         fromstripped = fromjid
         if resource != None:
             fromjid = JID(fromjid)
@@ -1115,7 +1115,7 @@ class Transport:
                 self.jabberqueue(Presence(frm = '%s@%s/messenger' % (YIDEncode(yid),config.jid), to = fromjid))
 
     def y_send_offline(self,fromjid,resource=None,status=None):
-        print fromjid,userlist[fromjid].roster
+        if config.dumpProtocol: print fromjid,userlist[fromjid].roster
         fromstripped = fromjid
         if resource != None:
             fromjid = JID(fromjid)
@@ -1149,7 +1149,7 @@ class Transport:
                 #print info['yip'],userlist[fromjid].username
                 if info['yip'] == userlist[fromjid].username:
                     jid = tojid
-                    print info['nick'], userlist[fromjid].nick
+                    if config.dumpProtocol: print info['nick'], userlist[fromjid].nick
                     if info['nick'] != userlist[fromjid].nick:
                         # join room with wrong nick
                         p = Presence(to = tojid, frm = '%s@%s/%s' % (RoomEncode(room),config.confjid,userlist[fromjid].nick))
@@ -1281,42 +1281,54 @@ if __name__ == '__main__':
             (i , o, e) = select.select(rdsocketlist.keys(),wrsocketlist.keys(),[],1)
         except ValueError:
             print "Value Error", rdsocketlist, wrsocketlist
+            logError()
             transport.findbadconn()
         except socket.error:
             print "Bad Socket", rdsocketlist, wrsocketlist
+            logError()
             transport.findbadconn()
         for each in i:
-            if rdsocketlist[each] == 'xmpp':
+            #print 'reading',each,rdsocketlist.has_key(each)
+            if rdsocketlist.has_key(each):
+                if rdsocketlist[each] == 'xmpp':
+                    try:
+                        connection.Process(1)
+                    except IOError:
+                        transport.xmpp_disconnect()
+                    except:
+                        logError()
+                    if not connection.isConnected():  transport.xmpp_disconnect()
+                else:
+                    try:
+                        rdsocketlist[each].Process()
+                    except socket.error:
+                        transport.y_closed(rdsocketlist[each])
+                    except:
+                        logError()
+        for each in o:
+            #print 'writing',each,rdsocketlist.has_key(each),wrsocketlist.has_key(each)
+            if rdsocketlist.has_key(each) and wrsocketlist.has_key(each):
                 try:
-                    connection.Process(1)
-                except IOError:
-                    transport.xmpp_disconnect()
-                except:
-                    logError()
-                if not connection.isConnected():  transport.xmpp_disconnect()
-            else:
-                try:
-                    rdsocketlist[each].Process()
+                    if rdsocketlist[each] == 'xmpp':
+                        while select.select([],[each],[])[1] and wrsocketlist[each] != []:
+                            connection.send(wrsocketlist[each].pop(0))
+                    else:
+                        #print wrsocketlist
+                        packet = wrsocketlist[each].pop(0)
+                        if config.dumpProtocol: ylib.printpacket(packet)
+                        each.send(packet)
+                    if wrsocketlist[each] == []:
+                        del wrsocketlist[each]
                 except socket.error:
                     transport.y_closed(rdsocketlist[each])
                 except:
                     logError()
-        for each in o:
-            try:
-                if rdsocketlist[each] == 'xmpp':
-                    while select.select([],[each],[])[1] and wrsocketlist[each] != []:
-                        connection.send(wrsocketlist[each].pop(0))
-                else:
-                    #print wrsocketlist
-                    packet = wrsocketlist[each].pop(0)
-                    if config.dumpProtocol: ylib.printpacket(packet)
-                    each.send(packet)
-                if wrsocketlist[each] == []:
+            else:
+                #print 'not writing',each,rdsocketlist.has_key(each),wrsocketlist.has_key(each)
+                if rdsocketlist.has_key(each):
+                    del rdsocketlist[each]
+                if wrsocketlist.has_key(each):
                     del wrsocketlist[each]
-            except socket.error:
-                transport.y_closed(rdsocketlist[each])
-            except:
-                logError()
         #delayed execution method modified from python-irclib written by Joel Rosdahl <joel@rosdahl.net>
         for each in timerlist:
             #print int(time.time())%each[0]-each[1]
@@ -1328,8 +1340,8 @@ if __name__ == '__main__':
     for each in [x for x in userlist.keys()]:
         userlist[each].connok = True
         transport.y_send_offline(each, status = transport.offlinemsg)
-        while wrsocketlist[connection.Connection._sock] != []:
-            connection.send(wrsocketlist[connection.Connection._sock].pop(0))
+    while wrsocketlist[connection.Connection._sock] != []:
+        connection.send(wrsocketlist[connection.Connection._sock].pop(0))
     del rdsocketlist[connection.Connection._sock]
     del wrsocketlist[connection.Connection._sock]
     userfile.close()

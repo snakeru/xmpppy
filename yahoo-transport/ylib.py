@@ -64,7 +64,7 @@ class YahooCon:
     def connect(self):
         self.connok=False
         while self.conncount != len(self.hostlist):
-            print self.conncount
+            if self.dumpProtocol: print "conncount", self.conncount
             self.sock = None
             self.sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
             self.sock.bind((self.fromhost,0))
@@ -79,7 +79,7 @@ class YahooCon:
 
     def moreservers(self):
         if self.conncount < len(self.hostlist):
-            print "more servers %s %s" % (len(self.hostlist),self.conncount)
+            if self.dumpProtocol: print "more servers %s %s" % (len(self.hostlist),self.conncount)
             return True
         else:
             return False
@@ -146,7 +146,7 @@ class YahooCon:
                     self.roster[pay[each][7]]=('available', typ, status)
                     if pay[each].has_key(213) and pay[each].has_key(197):
                         if pay[each][213] == '1':
-                            b = avatar.getavatar(pay[each][197])
+                            b = avatar.getavatar(pay[each][197], self.dumpProtocol)
                             if b != None and self.handlers.has_key('avatar'):
                                 self.handlers['avatar'](self.fromjid,pay[each][7],b)
                     if pay[each].has_key(13):
@@ -154,7 +154,7 @@ class YahooCon:
                         j = i%4
                         k= j%2
                         if i/4:
-                            print "contact is on games"
+                            if self.dumpProtocol: print "contact is on games"
                         if j/2:
                             if not self.resources.has_key(pay[each][7]):
                                 self.resources[pay[each][7]]=[]
@@ -193,7 +193,7 @@ class YahooCon:
                         j = i%4
                         k= j%2
                         if i/4:
-                            print "contact is off games"
+                            if self.dumpProtocol: print "contact is off games"
                         if not j/2:
                             if self.resources.has_key(pay[each][7]):
                                 if 'chat' in self.resources[pay[each][7]]:
@@ -350,7 +350,7 @@ class YahooCon:
             self.handlers['ping'](self)
 
     def ymsg_reqroom(self, hdr,pay):
-        print "got reqroom"
+        if self.dumpProtocol: print "got reqroom"
         if self.handlers.has_key('reqroom'):
             self.handlers['reqroom'](self.fromjid)
 
@@ -448,7 +448,7 @@ class YahooCon:
         return hdr+pay
 
     def ymsg_send_conflogon(self):
-        print self.cookies
+        if self.dumpProtocol: print "cookies",self.cookies
         pay = ymsg_mkargu({0:self.username,1:self.username,6: '%s; %s' % (self.cookies[0].replace('\t','=').split(';')[0],self.cookies[1].replace('\t','=').split(';')[0])})
         hdr = ymsg_mkhdr(self.version,len(pay),Y_confon,0x5a55aa55,self.session)
         return hdr+pay
@@ -578,7 +578,7 @@ class YahooCon:
             d[47] = '1'
         elif show == 'invisible':
             d[10]= '12'
-        print d
+        if self.dumpProtocol: print "send_online",d
         pay = ymsg_mkargu(d)
         hdr = ymsg_mkhdr(self.version,len(pay),Y_available,0,self.session)
         return hdr+pay
@@ -589,7 +589,7 @@ class YahooCon:
             argu[19] = msg.encode('utf-8')
             argu[10] = '99'
         argu[47] = '0'
-        print argu
+        if self.dumpProtocol: print "send_back",argu
         pay = ymsg_mkargu(argu)
         hdr = ymsg_mkhdr(self.version,len(pay),Y_available,0,self.session)
         return hdr+pay
@@ -607,7 +607,7 @@ class YahooCon:
             a[47] = '1'
         elif show == 'invisible':
             a[10]= '12'
-        print a
+        if self.dumpProtocol: print "send_away",a
         pay = ymsg_mkargu(a)
         hdr = ymsg_mkhdr(self.version, len(pay), Y_away,0,self.session)
         return hdr+pay
