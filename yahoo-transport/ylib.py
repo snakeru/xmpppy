@@ -650,9 +650,10 @@ class YahooCon:
                 self.handlers['closed'](self)
         while len(self.rbuf) >= 20:
             s,u = ymsg_dehdr(self.rbuf)
-            if s[0] != 'YMSG':
+            if s[0] != 'YMSG' or s[2] < 0:
                 if self.handlers.has_key('closed'):
                     self.handlers['closed'](self)
+                    break
             size = 20+s[2]
             #print size, len(self.rbuf)
             if len(self.rbuf) >= size:
