@@ -863,6 +863,7 @@ class Transport:
     def y_closed(self, yobj):
         if userlist.has_key(yobj.fromjid):
             if not yobj.connok:
+                if config.dumpProtocol: print "got closed, on not connok"
                 if yobj.moreservers():
                     if rdsocketlist.has_key(yobj.sock):
                         del rdsocketlist[yobj.sock]
@@ -883,11 +884,8 @@ class Transport:
                 timerlist.remove(yobj.pripingobj)
             if yobj.secpingobj in timerlist:
                 timerlist.remove(yobj.secpingobj)
-            try:
-                if yobj.confpingobj in timerlist:
-                    timerlist.remove(yobj.confpingobj)
-            except AttributeError:
-                pass
+            if 'confpingobj' in dir(yobj) and yobj.confpingobj in timerlist:
+                timerlist.remove(yobj.confpingobj)
             if userlist.has_key(yobj.fromjid):
                 del userlist[yobj.fromjid]
             if rdsocketlist.has_key(yobj.sock):
@@ -954,7 +952,7 @@ class Transport:
                 if userfile[yobj.fromjid]['username'] == yobj.username:
                     # If the userdetails has a blah@foo style username try taking the domain off first, then connect again
                     if userfile[yobj.fromjid]['username'].count('@'):
-                        yobj.username == yobj.username.split('@')[0]
+                        yobj.username = yobj.username.split('@')[0]
                         if yobj.moreservers():
                             if rdsocketlist.has_key(yobj.sock):
                                 del rdsocketlist[yobj.sock]
