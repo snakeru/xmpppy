@@ -426,7 +426,9 @@ class YahooCon:
 
     def ymsg_init(self):
         try:
-            return self.sock.send(self.ymsg_send_challenge())
+            challenge = self.ymsg_send_challenge()
+            if self.dumpProtocol: printpacket(challenge)
+            return self.sock.send(challenge)
         except:
             if self.handlers.has_key('loginfail'):
                 self.handlers['loginfail'](self)
@@ -663,7 +665,9 @@ class YahooCon:
                 if self.dumpProtocol: print 'recv', s, t, len(self.rbuf)
                 if s[3] == Y_chalreq:           #87
                     # give salt
-                    self.sock.send(self.ymsg_challenge(s,t))
+                    challenge = self.ymsg_challenge(s,t))
+                    if self.dumpProtocol: printpacket(challenge)
+                    self.sock.send(challenge)
                 elif s[3] == Y_login:           #85
                     # login ok
                     self.ymsg_login(s,t)
