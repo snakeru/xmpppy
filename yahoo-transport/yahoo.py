@@ -1200,11 +1200,15 @@ class Transport:
 
     def xmpp_connect(self):
         connected = self.jabber.connect((config.mainServer,config.port))
-        if connected:
-            self.register_handlers()
-            #print "try auth"
-            connected = self.jabber.auth(config.saslUsername,config.secret)
-            #print "auth return",connected
+        if config.dumpProtocol: print "connected:",connected
+        while not connected:
+            time.sleep(5)
+            connected = self.jabber.connect((config.mainServer,config.port))
+            if config.dumpProtocol: print "connected:",connected
+        self.register_handlers()
+        if config.dumpProtocol: print "trying auth"
+        connected = self.jabber.auth(config.saslUsername,config.secret)
+        if config.dumpProtocol: print "auth return:",connected
         return connected
 
     def xmpp_disconnect(self):
