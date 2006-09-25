@@ -43,6 +43,9 @@
 
     <!-- Allow users to register with this transport -->
     <allowRegister/>
+    
+    <!-- Allow users to use the Yahoo! chat rooms with this transport -->
+    <enableChatrooms/>
 
     <!-- Use external component binding. -->
     <!-- This dodges the need to manually configure all jids that talk to this transport. -->

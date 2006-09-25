@@ -251,7 +251,7 @@ class Transport:
                     else:
                         #print 'resource error'
                         self.jabberqueue(Error(event,ERR_BAD_REQUEST))
-                elif event.getTo().getDomain() == config.confjid:
+                elif config.enableChatrooms and event.getTo().getDomain() == config.confjid:
                     if event.getBody() == None:
                         return
                     yid = RoomDecode(event.getTo().getNode())
@@ -278,6 +278,8 @@ class Transport:
                             self.jabberqueue(Message(to=event.getFrom(), frm= to, typ='groupchat',body=event.getBody()))
                         else:
                             self.jabberqueue(Error(event,ERR_BAD_REQUEST))
+                else:
+                    self.jabberqueue(Error(event,ERR_BAD_REQUEST))
             else:
                 if config.dumpProtocol: print 'no item error'
                 self.jabberqueue(Error(event,ERR_REGISTRATION_REQUIRED))
@@ -444,7 +446,7 @@ class Transport:
                                 del yobj
                     else:
                         self.jabberqueue(Presence(to=fromjid,frm = config.jid, typ='unavailable'))
-            elif event.getTo().getDomain() == config.confjid:
+            elif config.enableChatrooms and event.getTo().getDomain() == config.confjid:
                 yid = RoomDecode(event.getTo().getNode())
                 yidenc = yid.encode('utf-8')
                 #Need to move Chatpings into this section for Yahoo rooms.
@@ -481,6 +483,8 @@ class Transport:
                         self.jabberqueue(Error(event,ERR_BAD_REQUEST))
                 else:
                     self.jabberqueue(Error(event,ERR_BAD_REQUEST))
+            else:
+                self.jabberqueue(Error(event,ERR_BAD_REQUEST))
         else:
             # Need to add auto-unsubscribe on probe events here.
             if event.getType() == 'probe':
@@ -549,8 +553,9 @@ class Transport:
                         'features':[NS_REGISTER,NS_VERSION,NS_COMMANDS,NS_AVATAR]}
                 if type == 'items':
                     list = [
-                        {'node':NODE_ROSTER,'name':VERSTR + ' Roster','jid':config.jid},
-                        {'jid':config.confjid,'name':VERSTR + ' Chatrooms'}]
+                        {'node':NODE_ROSTER,'name':config.discoName + ' Roster','jid':config.jid}]
+                    if config.enableChatrooms:
+                        list.append({'jid':config.confjid,'name':config.discoName + ' Chatrooms'})
                     if fromjid in config.admins:
                         list.append({'node':NODE_ADMIN,'name':config.discoName + ' Admin','jid':config.jid})
                     return list
@@ -630,7 +635,7 @@ class Transport:
                         return []
             else:
                 self.jabberqueue(Error(event,ERR_NOT_ACCEPTABLE))
-        elif to == config.confjid:
+        elif config.enableChatrooms and to == config.confjid:
             if node == None:
                 if type == 'info':
                     #if we return disco info for our subnodes when the server asks, then we get added to the server's item list
@@ -695,7 +700,7 @@ class Transport:
                                             n = RoomEncode('%s:%s' % (each['name'],c))
                                             list.append({'jid':'%s@%s'%(n,config.confjid),'name':'%s:%s'%(each['name'],c)})
                     return list
-        elif to.getDomain() == config.confjid:
+        elif config.enableChatrooms and to.getDomain() == config.confjid:
             if type == 'info':
                 yid = RoomDecode(event.getTo().getNode())
                 lobby,room = yid.split(':')
