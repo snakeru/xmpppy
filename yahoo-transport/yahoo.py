@@ -28,6 +28,7 @@ timerlist = []
 discoresults = {}
 
 NS_AVATAR='jabber:iq:avatar'
+NS_GATEWAY='jabber:iq:gateway'
 NODE_AVATAR='jabber:x:avatar x'
 NODE_VCARDUPDATE='vcard-temp:x:update x'
 NODE_ADMIN='admin'
@@ -148,6 +149,8 @@ class Transport:
         self.jabber.RegisterHandler('iq',self.xmpp_iq_register_get, typ = 'get', ns=NS_REGISTER)
         self.jabber.RegisterHandler('iq',self.xmpp_iq_register_set, typ = 'set', ns=NS_REGISTER)
         self.jabber.RegisterHandler('iq',self.xmpp_iq_avatar, typ = 'get', ns=NS_AVATAR)
+        self.jabber.RegisterHandler('iq',self.xmpp_iq_gateway_get, typ = 'get', ns=NS_GATEWAY)
+        self.jabber.RegisterHandler('iq',self.xmpp_iq_gateway_set, typ = 'set', ns=NS_GATEWAY)
         self.jabber.RegisterHandler('iq',self.xmpp_iq_vcard, typ = 'get', ns=NS_VCARD)
         #self.jabber.RegisterHandler('iq',self.xmpp_iq_notimplemented)
         #self.jabber.RegisterHandler('iq',self.xmpp_iq_mucadmin_set,typ = 'set', ns=NS_MUC_ADMIN)
@@ -828,6 +831,24 @@ class Transport:
                 self.jabberqueue(Error(event,ERR_ITEM_NOT_FOUND))
         else:
             self.jabberqueue(Error(event,ERR_ITEM_NOT_FOUND))
+        raise NodeProcessed
+
+    def xmpp_iq_gateway_get(self, con, event):
+        m = Iq(to = event.getFrom(), frm=event.getTo(), typ = 'result', queryNS=NS_GATEWAY, payload=[
+            Node('desc',payload='Please enter the Yahoo! ID of the person you would like to contact.'),
+            Node('prompt',payload='Yahoo! ID')])
+        m.setID(event.getID())
+        self.jabberqueue(m)
+        raise NodeProcessed
+
+    def xmpp_iq_gateway_set(self, con, event):
+        query = event.getTag('query')
+        jid = query.getTagData('prompt')
+        m = Iq(to = event.getFrom(), frm=event.getTo(), typ = 'result', queryNS=NS_GATEWAY, payload=[
+            Node('jid',payload='%s@%s'%(jid,config.jid)),     # JEP-0100 says use jid,
+            Node('prompt',payload='%s@%s'%(jid,config.jid))]) # but Psi uses prompt
+        m.setID(event.getID())
+        self.jabberqueue(m)
         raise NodeProcessed
 
     def xmpp_iq_vcard(self, con, event):
