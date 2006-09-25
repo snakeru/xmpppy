@@ -824,8 +824,14 @@ class Transport:
         fromjid = event.getFrom()
         fromstripped = fromjid.getStripped().encode('utf-8')
         if userfile.has_key(fromstripped):
-            if userfile[fromstripped].has_key('avatar'):
+            if event.getTo().getDomain() == config.jid:
                 yid = YIDDecode(event.getTo().getNode())
+            elif config.enableChatrooms and event.getTo().getDomain() == config.confjid:
+                yid = YIDDecode(event.getTo().getResource())
+            else:
+                self.jabberqueue(Error(event,ERR_ITEM_NOT_FOUND))
+                raise NodeProcessed
+            if userfile[fromstripped].has_key('avatar'):
                 if userfile[fromstripped]['avatar'].has_key(yid):
                     m = Iq(to = event.getFrom(), frm=event.getTo(), typ = 'result', queryNS=NS_AVATAR, payload=[Node('data',attrs={'mimetype':'image/png'},payload=base64.encodestring(userfile[fromstripped]['avatar'][yid][1]))])
                     m.setID(event.getID())
@@ -839,31 +845,39 @@ class Transport:
         raise NodeProcessed
 
     def xmpp_iq_gateway_get(self, con, event):
-        m = Iq(to = event.getFrom(), frm=event.getTo(), typ = 'result', queryNS=NS_GATEWAY, payload=[
-            Node('desc',payload='Please enter the Yahoo! ID of the person you would like to contact.'),
-            Node('prompt',payload='Yahoo! ID')])
-        m.setID(event.getID())
-        self.jabberqueue(m)
-        raise NodeProcessed
+        if event.getTo() == config.jid:
+            m = Iq(to = event.getFrom(), frm=event.getTo(), typ = 'result', queryNS=NS_GATEWAY, payload=[
+                Node('desc',payload='Please enter the Yahoo! ID of the person you would like to contact.'),
+                Node('prompt',payload='Yahoo! ID')])
+            m.setID(event.getID())
+            self.jabberqueue(m)
+            raise NodeProcessed
 
     def xmpp_iq_gateway_set(self, con, event):
-        query = event.getTag('query')
-        jid = query.getTagData('prompt')
-        m = Iq(to = event.getFrom(), frm=event.getTo(), typ = 'result', queryNS=NS_GATEWAY, payload=[
-            Node('jid',payload='%s@%s'%(jid,config.jid)),     # JEP-0100 says use jid,
-            Node('prompt',payload='%s@%s'%(jid,config.jid))]) # but Psi uses prompt
-        m.setID(event.getID())
-        self.jabberqueue(m)
-        raise NodeProcessed
+        if event.getTo() == config.jid:
+            query = event.getTag('query')
+            jid = query.getTagData('prompt')
+            m = Iq(to = event.getFrom(), frm=event.getTo(), typ = 'result', queryNS=NS_GATEWAY, payload=[
+                Node('jid',payload='%s@%s'%(jid,config.jid)),     # JEP-0100 says use jid,
+                Node('prompt',payload='%s@%s'%(jid,config.jid))]) # but Psi uses prompt
+            m.setID(event.getID())
+            self.jabberqueue(m)
+            raise NodeProcessed
 
     def xmpp_iq_vcard(self, con, event):
         fromjid = event.getFrom()
         fromstripped = fromjid.getStripped().encode('utf-8')
         if userfile.has_key(fromstripped):
+            if event.getTo().getDomain() == config.jid:
+                yid = YIDDecode(event.getTo().getNode())
+            elif config.enableChatrooms and event.getTo().getDomain() == config.confjid:
+                yid = YIDDecode(event.getTo().getResource())
+            else:
+                self.jabberqueue(Error(event,ERR_ITEM_NOT_FOUND))
+                raise NodeProcessed
             m = Iq(to = event.getFrom(), frm=event.getTo(), typ = 'result')
             m.setID(event.getID())
             v = m.addChild(name='vCard', namespace=NS_VCARD)
-            yid = YIDDecode(event.getTo().getNode())
             v.setTagData(tag='NICKNAME', val=yid)
             if userfile[fromstripped].has_key('avatar') and \
                 userfile[fromstripped]['avatar'].has_key(yid):
