@@ -144,11 +144,14 @@ class YahooCon:
                         elif pay[each][47] == '2':
                             typ = 'away'
                     self.roster[pay[each][7]]=('available', typ, status)
-                    if pay[each].has_key(213) and pay[each].has_key(197):
-                        if pay[each][213] == '1':
+                    if pay[each].has_key(198):
+                        if pay[each][198] == '1' and pay[each].has_key(197):
                             b = avatar.getavatar(pay[each][197], self.dumpProtocol)
                             if b != None and self.handlers.has_key('avatar'):
-                                self.handlers['avatar'](self.fromjid,pay[each][7],b)
+                                self.handlers['avatar'](self,pay[each][7],b)
+                        elif pay[each][198] == '0':
+                            if self.handlers.has_key('avatar'):
+                                self.handlers['avatar'](self,pay[each][7],None)
                     if pay[each].has_key(13):
                         i = int(pay[each][13])
                         j = i%4
@@ -172,6 +175,18 @@ class YahooCon:
                             if self.handlers.has_key('online'):
                                 self.handlers['online'](self,pay[each][7])
 
+    def ymsg_avatar(self,hdr,pay):
+        if pay[0].has_key(4):
+            for each in pay:
+                if pay[each].has_key(4):
+                    if pay[each].has_key(198):
+                        if pay[each][198] == '1' and pay[each].has_key(197):
+                            b = avatar.getavatar(pay[each][197], self.dumpProtocol)
+                            if b != None and self.handlers.has_key('avatar'):
+                                self.handlers['avatar'](self,pay[each][4],b)
+                        elif pay[each][198] == '0':
+                            if self.handlers.has_key('avatar'):
+                                self.handlers['avatar'](self,pay[each][4],None)
 
     def ymsg_imvset(self,hdr,pay):
         if pay[0].has_key(7):
@@ -701,8 +716,12 @@ class YahooCon:
                     self.ymsg_imvset(s,t)
                 elif s[3] == Y_away:            #3
                     self.ymsg_away(s,t)
+                elif s[3] == Y_avatar:       #188
+                    self.ymsg_avatar(s,t)
                 elif s[3] == Y_statusupdate: #198
                     self.ymsg_away(s,t)
+                #elif s[3] == Y_advstatusupdate: #199
+                #    pass self.ymsg_updatedavatar(s,t)
                 elif s[3] == Y_available:       #4
                     self.ymsg_back(s,t)
                 elif s[3] == Y_calendar:

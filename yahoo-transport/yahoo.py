@@ -27,6 +27,9 @@ userlist = {}
 timerlist = []
 discoresults = {}
 
+NS_AVATAR='jabber:iq:avatar'
+NODE_AVATAR='jabber:x:avatar x'
+NODE_VCARDUPDATE='vcard-temp:x:update x'
 NODE_ADMIN='admin'
 NODE_ADMIN_REGISTERED_USERS='registered-users'
 NODE_ADMIN_ONLINE_USERS='online-users'
@@ -144,7 +147,7 @@ class Transport:
         self.jabber.RegisterHandler('iq',self.xmpp_iq_version,typ = 'get', ns=NS_VERSION)
         self.jabber.RegisterHandler('iq',self.xmpp_iq_register_get, typ = 'get', ns=NS_REGISTER)
         self.jabber.RegisterHandler('iq',self.xmpp_iq_register_set, typ = 'set', ns=NS_REGISTER)
-        self.jabber.RegisterHandler('iq',self.xmpp_iq_avatar, typ = 'get', ns='jabber:iq:avatar')
+        self.jabber.RegisterHandler('iq',self.xmpp_iq_avatar, typ = 'get', ns=NS_AVATAR)
         self.jabber.RegisterHandler('iq',self.xmpp_iq_vcard, typ = 'get', ns=NS_VCARD)
         #self.jabber.RegisterHandler('iq',self.xmpp_iq_notimplemented)
         #self.jabber.RegisterHandler('iq',self.xmpp_iq_mucadmin_set,typ = 'set', ns=NS_MUC_ADMIN)
@@ -540,7 +543,7 @@ class Transport:
                     return {
                         'ids':[
                             {'category':'gateway','type':'yahoo','name':VERSTR}],
-                        'features':[NS_REGISTER,NS_VERSION,NS_COMMANDS]}
+                        'features':[NS_REGISTER,NS_VERSION,NS_COMMANDS,NS_AVATAR]}
                 if type == 'items':
                     list = [
                         {'node':NODE_ROSTER,'name':VERSTR + ' Roster','jid':config.jid},
@@ -609,10 +612,10 @@ class Transport:
                 yid = YIDDecode(event.getTo().getNode())
                 if type == 'info':
                     if userlist[fromstripped].roster.has_key(yid):
-                        features = []
+                        features = [NS_VCARD,NS_VERSION]
                         if userfile[fromstripped.encode('utf-8')].has_key('avatar'):
                             if userfile[fromstripped.encode('utf-8')]['avatar'].has_key(yid):
-                                features.append({'var':'jabber:iq:avatar'})
+                                features.append(NS_AVATAR)
                         return {
                             'ids':[
                                 {'category':'client','type':'yahoo','name':yid}],
@@ -816,7 +819,7 @@ class Transport:
             if userfile[fromstripped].has_key('avatar'):
                 yid = YIDDecode(event.getTo().getNode())
                 if userfile[fromstripped]['avatar'].has_key(yid):
-                    m = Iq(to = event.getFrom(), frm=event.getTo(), typ = 'result', queryNS='jabber:iq:avatar', payload=[Node('data',attrs={'mimetype':'image/png'},payload=base64.encodestring(userfile[fromstripped]['avatar'][yid][1]))])
+                    m = Iq(to = event.getFrom(), frm=event.getTo(), typ = 'result', queryNS=NS_AVATAR, payload=[Node('data',attrs={'mimetype':'image/png'},payload=base64.encodestring(userfile[fromstripped]['avatar'][yid][1]))])
                     m.setID(event.getID())
                     self.jabberqueue(m)
                 else:
@@ -831,34 +834,38 @@ class Transport:
         fromjid = event.getFrom()
         fromstripped = fromjid.getStripped().encode('utf-8')
         if userfile.has_key(fromstripped):
-            if userfile[fromstripped].has_key('avatar'):
-                yid = YIDDecode(event.getTo().getNode())
-                if userfile[fromstripped]['avatar'].has_key(yid):
-                    m = Iq(to = event.getFrom(), frm=event.getTo(), typ = 'result')
-                    m.setID(event.getID())
-                    v = m.addChild(name='vCard', namespace=NS_VCARD)
-                    p = v.addChild(name='PHOTO')
-                    p.setTagData(tag='TYPE', val='image/png')
-                    p.setTagData(tag='BINVAL', val=base64.encodestring(userfile[fromstripped]['avatar'][yid][1]))
-                    self.jabberqueue(m)
-                else:
-                    self.jabberqueue(Error(event,ERR_ITEM_NOT_FOUND))
-            else:
-                self.jabberqueue(Error(event,ERR_ITEM_NOT_FOUND))
+            m = Iq(to = event.getFrom(), frm=event.getTo(), typ = 'result')
+            m.setID(event.getID())
+            v = m.addChild(name='vCard', namespace=NS_VCARD)
+            yid = YIDDecode(event.getTo().getNode())
+            v.setTagData(tag='NICKNAME', val=yid)
+            if userfile[fromstripped].has_key('avatar') and \
+                userfile[fromstripped]['avatar'].has_key(yid):
+                p = v.addChild(name='PHOTO')
+                p.setTagData(tag='TYPE', val='image/png')
+                p.setTagData(tag='BINVAL', val=base64.encodestring(userfile[fromstripped]['avatar'][yid][1]))
+            self.jabberqueue(m)
         else:
             self.jabberqueue(Error(event,ERR_ITEM_NOT_FOUND))
         raise NodeProcessed
 
-    def y_avatar(self,fromjid,yid,avatar):
+    def y_avatar(self,yobj,yid,avatar):
+        hex = None
+        conf = userfile[yobj.fromjid]
+        if not conf.has_key('avatar'):
+            conf['avatar']={}
         if avatar != None:
             a = sha.new(avatar)
             hex = a.hexdigest()
-        conf = userfile[fromjid]
-        if not conf.has_key('avatar'):
-            conf['avatar']={}
-        conf['avatar'][yid]=(hex,avatar)
-        userfile[fromjid] = conf
+            conf['avatar'][yid]=(hex,avatar)
+        elif conf['avatar'].has_key(yid):
+            hex = ''
+            del conf['avatar'][yid]
+        userfile[yobj.fromjid] = conf
         userfile.sync()
+        if hex != None:
+            if config.dumpProtocol: print "avatar:",hex
+            self.y_online(yobj,yid,forceavatar=1)
 
     def y_closed(self, yobj):
         if userlist.has_key(yobj.fromjid):
@@ -981,7 +988,14 @@ class Transport:
             yobj.sock.close()
             del yobj
 
-    def y_online(self,yobj,yid):
+    def y_online(self,yobj,yid,forceavatar=0):
+        hex = None
+        if userfile[yobj.fromjid].has_key('avatar'):
+            if config.dumpProtocol: print userfile[yobj.fromjid]['avatar'].keys(), yid
+            if userfile[yobj.fromjid]['avatar'].has_key(yid):
+                hex = userfile[yobj.fromjid]['avatar'][yid][0]
+        if hex == None and forceavatar:
+            hex = ''
         #print yobj.xresources.keys()
         for each in yobj.xresources.keys():
             mjid = JID(yobj.fromjid)
@@ -993,10 +1007,9 @@ class Transport:
                 status = None
             if config.dumpProtocol: print status
             b = Presence(to = mjid, frm = '%s@%s/messenger'%(YIDEncode(yid), config.jid),priority = 10, show=yobj.roster[yid][1], status=status)
-            if userfile[yobj.fromjid].has_key('avatar'):
-                if config.dumpProtocol: print userfile[yobj.fromjid]['avatar'].keys(), yid
-                if userfile[yobj.fromjid]['avatar'].has_key(yid):
-                    b.addChild(node=Node('jabber:x:avatar x',payload=[Node('hash',payload=userfile[yobj.fromjid]['avatar'][yid][0])]))
+            if hex != None:
+                b.addChild(node=Node(NODE_AVATAR,payload=[Node('hash',payload=hex)]))
+                b.addChild(node=Node(NODE_VCARDUPDATE,payload=[Node('photo',payload=hex)]))
             self.jabberqueue(b)
 
     def y_chatonline(self,yobj, yid):

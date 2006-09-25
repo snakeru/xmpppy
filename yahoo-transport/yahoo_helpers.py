@@ -43,7 +43,9 @@ Y_inviteroom = 157  # Invite Room
 Y_chatlogout = 160      # Logout
 Y_ping = 161        # Primary Ping
 Y_chtmsg = 168      # Chat Message
+Y_avatar = 188      # Avatar Image update
 Y_statusupdate = 198 #update of status (like away/back etc)
+Y_advstatusupdate = 199 #update of advanced status (like avatar etc)
 
 Yahoosep = '\xc0\x80'
 
