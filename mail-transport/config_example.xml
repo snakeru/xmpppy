@@ -42,6 +42,9 @@
     <!-- The file to log to. Leave this disabled for stdout only -->
     <debugFile>mailerror.log</debugFile>
 
+    <!-- Show the raw data being sent and received from the xmpp and mail servers -->
+    <!--<dumpProtocol/>-->
+
     <!-- The smtp server to use for outgoing mails -->
     <smtpServer>localhost</smtpServer>
 

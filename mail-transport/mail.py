@@ -84,15 +84,15 @@ class Transport:
         if event.getBody() == None:
             return
         if to.getNode() != '':
-            
+
             mto = to.getNode().replace('%', '@')
-            
+
             fromsplit = fromstripped.split('@', 1)
             mfrom = None
             for mapping in self.mappings:
                 if mapping[0] == fromsplit[1]:
                     mfrom = '%s@%s' % (fromsplit[0], mapping[1])
-            
+
             if mfrom:
                 subject = event.getSubject()
                 body = event.getBody()
@@ -101,16 +101,17 @@ class Transport:
                 if subject: msg['Subject'] = subject
                 msg['From'] = mfrom
                 msg['To'] = mto
-                
+
                 try:
+                    if config.dumpProtocol: print 'SENDING:\n' + msg.as_string()
                     mailserver = smtplib.SMTP(config.smtpServer)
-                    #mailserver.set_debuglevel(1)
+                    if config.dumpProtocol: mailserver.set_debuglevel(1)
                     mailserver.sendmail(mfrom, mto, msg.as_string())
                     mailserver.quit()
                 except:
                     logError()
                     self.jabber.send(Error(event,ERR_RECIPIENT_UNAVAILABLE))
-                
+
             else:
                 self.jabber.send(Error(event,ERR_REGISTRATION_REQUIRED))
         else:
@@ -132,6 +133,8 @@ class Transport:
             fp.close()
             os.remove(fullname)
             
+            if config.dumpProtocol: print 'RECEIVING:\n' + msg.as_string()
+
             mfrom = email.Utils.parseaddr(msg['From'])[1]
             mto = email.Utils.parseaddr(msg['To'])[1]
             
@@ -155,11 +158,15 @@ class Transport:
 
     def xmpp_connect(self):
         connected = self.jabber.connect((config.mainServer,config.port))
-        if connected:
-            self.register_handlers()
-            #print "try auth"
-            connected = self.jabber.auth(config.saslUsername,config.secret)
-            #print "auth return",connected
+        if config.dumpProtocol: print "connected:",connected
+        while not connected:
+            time.sleep(5)
+            connected = self.jabber.connect((config.mainServer,config.port))
+            if config.dumpProtocol: print "connected:",connected
+        self.register_handlers()
+        if config.dumpProtocol: print "trying auth"
+        connected = self.jabber.auth(config.saslUsername,config.secret)
+        if config.dumpProtocol: print "auth return:",connected
         return connected
 
 def loadConfig():
@@ -205,7 +212,11 @@ if __name__ == '__main__':
     if config.debugFile:
         logfile = open(config.debugFile,'a')
 
-    connection = xmpp.client.Component(config.jid,config.port,sasl=sasl,bind=config.useComponentBinding,route=config.useRouteWrap)
+    if config.dumpProtocol:
+        debug=['always', 'nodebuilder']
+    else:
+        debug=[]
+    connection = xmpp.client.Component(config.jid,config.port,debug=debug,sasl=sasl,bind=config.useComponentBinding,route=config.useRouteWrap)
     transport = Transport(connection)
     if not transport.xmpp_connect():
         print "Could not connect to server, or password mismatch!"
