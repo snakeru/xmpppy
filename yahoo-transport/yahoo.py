@@ -1118,10 +1118,11 @@ class Transport:
             fromjid = JID(fromjid)
             fromjid.setResource(resource)
         self.jabberqueue(Presence(to=fromjid,frm = config.jid, typ='unavailable',status=status))
-        for yid in self.userlist[fromstripped].roster:
-            if self.userlist[fromstripped].roster[yid][0] == 'available':
-                self.jabberqueue(Presence(frm = '%s@%s/messenger' % (YIDEncode(yid),config.jid), to = fromjid, typ='unavailable'))
-                self.jabberqueue(Presence(frm = '%s@%s/chat' % (YIDEncode(yid),config.jid), to = fromjid, typ='unavailable'))
+        if self.userlist.has_key(fromstripped):
+            for yid in self.userlist[fromstripped].roster:
+                if self.userlist[fromstripped].roster[yid][0] == 'available':
+                    self.jabberqueue(Presence(frm = '%s@%s/messenger' % (YIDEncode(yid),config.jid), to = fromjid, typ='unavailable'))
+                    self.jabberqueue(Presence(frm = '%s@%s/chat' % (YIDEncode(yid),config.jid), to = fromjid, typ='unavailable'))
 
     #chat room functions
     def y_chat_login(self,fromjid):
