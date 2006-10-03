@@ -20,7 +20,10 @@
 # $Id$
 #
 # $Log$
-# Revision 1.1  2005-11-16 23:57:18  normanr
+# Revision 1.2  2006-10-03 18:44:38  normanr
+# don't strip accented letters unless requested
+#
+# Revision 1.1  2005/11/16 23:57:18  normanr
 # Ported the curphoo code that was being used, to python.  This means no more need to recompile curphoo when you upgrade python.  Also yahoo transport now runs anywhere python does, and it's not limited to linux.
 #
 # Revision 1.1  2003/09/25 17:31:45  mkennedy
@@ -45,7 +48,7 @@ ALT_TAG = re.compile('</?alt.*?>', re.I)
 
 												# cheetachat crap control
 SND_TAG = re.compile('</?snd.*?>', re.I)
-												# ECMA-48 SGR sequence
+												# ECMA-48 SGR sequence, colour parsing re: re.sub('\x1b\[([0-9]+)])m','<ascii colour=\\1>',string)
 ESC_SEQ = re.compile(r'\033\[.*?m')
 
 MULTI_NL = re.compile('\n+', re.M)
@@ -86,6 +89,7 @@ def do(text, sess = None):
 	text = ESC_SEQ.sub('', text)
 	text = text.replace('\x0d\x0a', ' ')
 	text = text.replace('\x0d', '')
+	text = text.replace('\x0b', '')
 	text = COLOR_TAG.sub('', text)
 	text = FONT_TAG.sub('', text)
 	text = FADE_TAG.sub('', text)
@@ -95,7 +99,8 @@ def do(text, sess = None):
 	text = MULTI_NL.sub('\n', text)
 	if (sess != None and sess.rc['auto-lowercase'].upper() == 'Y'):
 		text = no_all_caps(text)
-	text = no_nonprint(text)
+	if (sess != None and sess.rc['remove-nonprintable'].upper() == 'Y'):
+	    text = no_nonprint(text)
 	text = text.strip()
 	return text
 

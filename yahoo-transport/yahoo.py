@@ -36,12 +36,6 @@ NODE_ADMIN_REGISTERED_USERS='registered-users'
 NODE_ADMIN_ONLINE_USERS='online-users'
 NODE_ROSTER='roster'
 
-# colour parsing re: re.sub('\x1b\[([0-9]+)])m','<asci colour=\\1>',string)
-
-def stripformatting(text):
-    text = re.sub('\x0b','',text)
-    return cpformat.do(text)
-
 def YIDEncode(yid):
     return yid.replace('@','%')
 
@@ -1043,7 +1037,7 @@ class Transport:
             mjid.setResource(each)
             #print mjid, each
             if yobj.roster[yid][2] != None:
-                status = stripformatting(yobj.roster[yid][2])
+                status = cpformat.do(yobj.roster[yid][2])
             else:
                 status = None
             if config.dumpProtocol: print status
@@ -1078,7 +1072,7 @@ class Transport:
         self.jabberqueue(Presence(typ='subscribe',frm = '%s@%s' % (YIDEncode(yid), config.jid), to=yobj.fromjid,payload=msg))
 
     def y_message(self,yobj,yid,msg):
-        m = Message(typ='chat',frm = '%s@%s/messenger' %(YIDEncode(yid),config.jid), to=yobj.fromjid,body=stripformatting(msg))
+        m = Message(typ='chat',frm = '%s@%s/messenger' %(YIDEncode(yid),config.jid), to=yobj.fromjid,body=cpformat.do(msg))
         m.setTag('x',namespace=NS_EVENT).setTag('composing')
         self.jabberqueue(m)
 
@@ -1086,12 +1080,12 @@ class Transport:
         self.jabberqueue(Error(Message(typ='chat',to = '%s@%s' %(YIDEncode(yid),config.jid), frm=yobj.fromjid,body=msg),ERR_SERVICE_UNAVAILABLE))
 
     def y_chatmessage(self,yobj,yid,msg):
-        m = Message(typ='chat',frm = '%s@%s/chat' %(YIDEncode(yid),config.jid), to=yobj.fromjid,body=stripformatting(msg))
+        m = Message(typ='chat',frm = '%s@%s/chat' %(YIDEncode(yid),config.jid), to=yobj.fromjid,body=cpformat.do(msg))
         m.setTag('x',namespace=NS_EVENT).setTag('composing')
         self.jabberqueue(m)
 
     def y_roommessage(self,yobj,yid,room,msg):
-        txt = stripformatting(msg)
+        txt = cpformat.do(msg)
         to = JID(yobj.fromjid)
         to.setResource(yobj.chatresource)
         if yobj.roomlist[room]['byyid'].has_key(yid):
@@ -1115,12 +1109,12 @@ class Transport:
 
     def y_email(self,yobj, fromtxt, fromaddr, subj):
         if fromtxt != None:
-            bfrom = stripformatting(fromtxt)
+            bfrom = cpformat.do(fromtxt)
         else:
             bfrom = ''
         if fromaddr != None:
-            bfrom = bfrom + ' <' + stripformatting(fromaddr) + '>'
-        m = Message(frm=config.jid,to=yobj.fromjid,typ='headline', subject = "Yahoo Email Event", body = 'From: %s\nSubject: %s'% (unicode(bfrom,'utf-8','replace'),unicode(stripformatting(subj),'utf-8','replace')))
+            bfrom = bfrom + ' <' + cpformat.do(fromaddr) + '>'
+        m = Message(frm=config.jid,to=yobj.fromjid,typ='headline', subject = "Yahoo Email Event", body = 'From: %s\nSubject: %s'% (unicode(bfrom,'utf-8','replace'),unicode(cpformat.do(subj),'utf-8','replace')))
         self.jabberqueue(m)
 
     def y_reg_login(self,yobj):
