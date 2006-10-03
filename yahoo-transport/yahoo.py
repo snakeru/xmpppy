@@ -216,11 +216,12 @@ class Transport:
                     yidenc = yid.encode('utf-8')
                     if event.getBody() == None:
                         xevent = event.getTag('x',namespace=NS_EVENT)
-                        state = '0'
-                        for events in xevent.getChildren():
-                            if events.getName() == 'composing':
-                                state = '1'
-                        self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_notify(yidenc,state))
+                        if xevent:
+                            state = '0'
+                            for events in xevent.getChildren():
+                                if events.getName() == 'composing':
+                                    state = '1'
+                            self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_notify(yidenc,state))
                         return
                     resource = 'messenger'
                     # normal non-groupchat or conference cases
