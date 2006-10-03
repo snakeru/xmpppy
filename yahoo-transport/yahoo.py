@@ -870,7 +870,7 @@ class Transport:
                         return # this method terminates here - all change please
                 else:
                     self.y_loginfail(yobj)
-            self.jabberqueue(Presence(to = yobj.fromjid, frm = config.jid, typ='unavailable'))
+            self.y_send_offline(yobj.fromjid)
             self.jabberqueue(Error(Presence(frm = yobj.fromjid, to = config.jid),ERR_REMOTE_SERVER_TIMEOUT))
             if yobj.pripingobj in timerlist:
                 timerlist.remove(yobj.pripingobj)
@@ -884,7 +884,8 @@ class Transport:
                 del rdsocketlist[yobj.sock]
             if wrsocketlist.has_key(yobj.sock):
                 del wrsocketlist[yobj.sock]
-            #yobj.sock.close()
+            if yobj.sock:
+                yobj.sock.close()
             del yobj
 
     def y_ping(self, yobj):
