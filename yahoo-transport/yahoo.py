@@ -50,7 +50,7 @@ def RoomDecode(yid):
 
 class Transport:
 
-    # This class is the main collection of where all the handlers for both the IRC and Jabber
+    # This class is the main collection of where all the handlers for both the Yahoo and Jabber
 
     #Global structures
     userlist = {}
@@ -1354,8 +1354,6 @@ if __name__ == '__main__':
         logfile.close()
     if transport.restart:
         args=[sys.executable]+sys.argv
-        if os.name == 'nt':
-            def quote(a): return "\"%s\"" % a
-            args = map(quote, args)
-        #print sys.executable, args
+        if os.name == 'nt': args = ["\"%s\"" % a for a in args]
+        if config.dumpProtocol: print sys.executable, args
         os.execv(sys.executable, args)
