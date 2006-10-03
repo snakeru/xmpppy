@@ -10,25 +10,21 @@ version = 'CVS ' + '$Revision$'.split()[1]
 # For a full copy of the license please go here http://www.gnu.org/licenses/licenses.html#GPL
 
 import base64, ConfigParser, os, platform, re, select, sha, shelve, signal, socket, sys, time, traceback
+import xmpp.client
 from curphoo import cpformat
 from xmpp.protocol import *
 from xmpp.browser import *
-from xmpp.commands import *
 from xmpp.jep0106 import *
 import config, roomlist, xmlconfig, ylib
-from jep0133 import *
+from adhoc import AdHocCommands
 from toolbox import *
 
 VERSTR = 'Yahoo! Transport'
 rdsocketlist = {}
 wrsocketlist = {}
-userlist = {}
 #each item is a tuple of 4 values, 0 == frequency in seconds, 1 == offset from 0, 2 == function, 3 == arguments
 timerlist = []
-discoresults = {}
 
-NS_AVATAR='jabber:iq:avatar'
-NS_GATEWAY='jabber:iq:gateway'
 NODE_AVATAR='jabber:x:avatar x'
 NODE_VCARDUPDATE='vcard-temp:x:update x'
 NODE_ADMIN='admin'
@@ -52,45 +48,13 @@ def RoomDecode(yid):
         return m.group(1).upper()
     return roomdeccodere.sub(decode, JIDDecode(yid))
 
-class Connect_Registered_Users_Command(xmpp.commands.Command_Handler_Prototype):
-    """This is the """
-    name = "connect-users"
-    description = 'Connect all registered users'
-    discofeatures = [xmpp.commands.NS_COMMANDS]
-
-    def __init__(self,jid=''):
-        """Initialise the command object"""
-        xmpp.commands.Command_Handler_Prototype.__init__(self,jid)
-        self.initial = { 'execute':self.cmdFirstStage }
-
-    def _DiscoHandler(self,conn,request,type):
-        """The handler for discovery events"""
-        if request.getFrom().getStripped() in config.admins:
-            return xmpp.commands.Command_Handler_Prototype._DiscoHandler(self,conn,request,type)
-        else:
-            return None
-
-    def cmdFirstStage(self,conn,request):
-        """Build the reply to complete the request"""
-        if request.getFrom().getStripped() in config.admins:
-            for each in userfile.keys():
-                conn.send(Presence(to=each, frm = config.jid, typ = 'probe'))
-                if userfile[each].has_key('servers'):
-                    for server in userfile[each]['servers']:
-                        conn.send(Presence(to=each, frm = '%s@%s'%(server,config.jid), typ = 'probe'))
-            reply = request.buildReply('result')
-            form = DataForm(typ='result',data=[DataField(value='Command completed.',typ='fixed')])
-            reply.addChild(name='command',namespace=NS_COMMAND,attrs={'node':request.getTagAttr('command','node'),'sessionid':self.getSessionID(),'status':'completed'},payload=[form])
-            self._owner.send(reply)
-        else:
-            self._owner.send(Error(request,ERR_FORBIDDEN))
-        raise NodeProcessed
-
 class Transport:
 
     # This class is the main collection of where all the handlers for both the IRC and Jabber
 
     #Global structures
+    userlist = {}
+    discoresults = {}
     online = 1
     restart = 0
     offlinemsg = ''
@@ -107,23 +71,23 @@ class Transport:
 
     def yahooqueue(self,fromjid,packet):
         if packet != None:
-            s = userlist[fromjid].sock
+            s = self.userlist[fromjid].sock
             if not wrsocketlist.has_key(s):
                 wrsocketlist[s]=[]
             wrsocketlist[s].append(packet)
 
     def findbadconn(self):
         #print rdsocketlist
-        for each in userlist:
-            if config.dumpProtocol: print each, userlist[each].sock.fileno()
-            if userlist[each].sock.fileno() == -1:
-                #print each, userlist[each].sock.fileno()
-                self.y_closed(userlist[each])
+        for each in self.userlist:
+            if config.dumpProtocol: print each, self.userlist[each].sock.fileno()
+            if self.userlist[each].sock.fileno() == -1:
+                #print each, self.userlist[each].sock.fileno()
+                self.y_closed(self.userlist[each])
             else:
                 try:
-                    a,b,c = select.select([userlist[each].sock],[userlist[each].sock],[userlist[each].sock],0)
+                    a,b,c = select.select([self.userlist[each].sock],[self.userlist[each].sock],[self.userlist[each].sock],0)
                 except:
-                    self.y_closed(userlist[each])
+                    self.y_closed(self.userlist[each])
         badlist = []
         for each in wrsocketlist.keys():
             try:
@@ -151,22 +115,8 @@ class Transport:
         #self.jabber.RegisterHandler('iq',self.xmpp_iq_mucadmin_get,typ = 'get', ns=NS_MUC_ADMIN)
         self.disco = Browser()
         self.disco.PlugIn(self.jabber)
-        self.command = Commands(self.disco)
-        self.command.PlugIn(self.jabber)
-        self.cmdconnectusers = Connect_Registered_Users_Command(jid=config.jid)
-        self.cmdconnectusers.plugin(self.command)
-        self.cmdonlineusers = Online_Users_Command(userlist,jid=config.jid)
-        self.cmdonlineusers.plugin(self.command)
-        self.cmdactiveusers = Active_Users_Command(userlist,jid=config.jid)
-        self.cmdactiveusers.plugin(self.command)
-        self.cmdregisteredusers = Registered_Users_Command(userfile,jid=config.jid)
-        self.cmdregisteredusers.plugin(self.command)
-        self.cmdeditadminusers = Edit_Admin_List_Command(jid=config.jid)
-        self.cmdeditadminusers.plugin(self.command)
-        self.cmdrestartservice = Restart_Service_Command(self,jid=config.jid)
-        self.cmdrestartservice.plugin(self.command)
-        self.cmdshutdownservice = Shutdown_Service_Command(self,jid=config.jid)
-        self.cmdshutdownservice.plugin(self.command)
+        self.adhoccommands = AdHocCommands(userfile)
+        self.adhoccommands.PlugIn(self)
         self.disco.setDiscoHandler(self.xmpp_base_disco,node='',jid=config.jid)
         self.disco.setDiscoHandler(self.xmpp_base_disco,node='',jid=config.confjid)
         self.disco.setDiscoHandler(self.xmpp_base_disco,node='',jid='')
@@ -204,7 +154,7 @@ class Transport:
             return
         fromstripped = fromjid.getStripped().encode('utf8')
         if event.getTo().getNode() != None:
-            if userlist.has_key(fromstripped):
+            if self.userlist.has_key(fromstripped):
                 if event.getTo().getDomain() == config.jid:
                     yid = YIDDecode(event.getTo().getNode())
                     yidenc = yid.encode('utf-8')
@@ -215,7 +165,7 @@ class Transport:
                             for events in xevent.getChildren():
                                 if events.getName() == 'composing':
                                     state = '1'
-                            self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_notify(yidenc,state))
+                            self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_notify(yidenc,state))
                         return
                     resource = 'messenger'
                     # normal non-groupchat or conference cases
@@ -223,11 +173,11 @@ class Transport:
                         if event.getType() == None or event.getType() =='normal':
                             # normal message case
                             #print 'got message'
-                            self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_message(yidenc,event.getBody().encode('utf-8')))
+                            self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_message(yidenc,event.getBody().encode('utf-8')))
                         elif event.getType() == 'chat':
                             # normal chat case
                             #print 'got message'
-                            self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_message(yidenc,event.getBody().encode('utf-8')))
+                            self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_message(yidenc,event.getBody().encode('utf-8')))
                         else:
                             #print 'type error'
                             self.jabberqueue(Error(event,ERR_BAD_REQUEST))
@@ -235,11 +185,11 @@ class Transport:
                         if event.getType() == None or event.getType() =='normal':
                             # normal message case
                             #print 'got message'
-                            self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_chatmessage(yidenc,event.getBody().encode('utf-8')))
+                            self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_chatmessage(yidenc,event.getBody().encode('utf-8')))
                         elif event.getType() == 'chat':
                             # normal chat case
                             #print 'got message'
-                            self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_chatmessage(yidenc,event.getBody().encode('utf-8')))
+                            self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_chatmessage(yidenc,event.getBody().encode('utf-8')))
                         else:
                             #print 'type error'
                             self.jabberqueue(Error(event,ERR_BAD_REQUEST))
@@ -255,9 +205,9 @@ class Transport:
                         self.jabberqueue(Error(event,ERR_NOT_IMPLEMENTED))
                         return
                     if event.getTo().getResource() == None or event.getTo().getResource() == '':
-                        #print userlist[fromstripped].roomlist, userlist[fromstripped].roomnames
-                        if userlist[fromstripped].roomnames.has_key(yid.lower()):
-                            room = userlist[fromstripped].roomnames[yid.lower()].encode('utf-8')
+                        #print self.userlist[fromstripped].roomlist, self.userlist[fromstripped].roomnames
+                        if self.userlist[fromstripped].roomnames.has_key(yid.lower()):
+                            room = self.userlist[fromstripped].roomnames[yid.lower()].encode('utf-8')
                         else:
                             room = None
                         if config.dumpProtocol: print "groupchat room: ",room
@@ -268,8 +218,8 @@ class Transport:
                             else:
                                 type = 1
                                 body = event.getBody().encode('utf-8')
-                            self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_roommsg(room,body,type))
-                            to = '%s/%s'%(event.getTo(),userlist[fromstripped].username)
+                            self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_roommsg(room,body,type))
+                            to = '%s/%s'%(event.getTo(),self.userlist[fromstripped].username)
                             self.jabberqueue(Message(to=event.getFrom(), frm= to, typ='groupchat',body=event.getBody()))
                         else:
                             self.jabberqueue(Error(event,ERR_BAD_REQUEST))
@@ -291,7 +241,7 @@ class Transport:
                 yid = YIDDecode(event.getTo().getNode())
                 yidenc = yid.encode('utf-8')
                 if event.getType() == 'subscribed':
-                    if userlist.has_key(fromstripped):
+                    if self.userlist.has_key(fromstripped):
                         if event.getTo() == config.jid:
                             conf = userfile[fromstripped]
                             conf['subscribed']=True
@@ -300,8 +250,8 @@ class Transport:
                             #For each new user check if rosterx is adversited then do the rosterx message, else send a truckload of subscribes.
                             #Part 1, parse the features out of the disco result
                             features = []
-                            if discoresults.has_key(event.getFrom().getStripped().encode('utf8')):
-                                discoresult = discoresults[event.getFrom().getStripped().encode('utf8')]
+                            if self.discoresults.has_key(event.getFrom().getStripped().encode('utf8')):
+                                discoresult = self.discoresults[event.getFrom().getStripped().encode('utf8')]
                                 #for i in discoresult.getQueryPayload():
                                 if discoresult.getTag('query').getTag('feature'): features.append(discoresult.getTag('query').getAttr('var'))
                             #Part 2, make the rosterX message
@@ -309,7 +259,7 @@ class Transport:
                                 m = Message(to = fromjid, frm = config.jid, subject= 'Yahoo Roster Items', body = 'Items from Yahoo Roster')
                                 p=None
                                 p= m.setTag('x',namespace = NS_ROSTERX)
-                                yrost = userlist[fromstripped].buddylist
+                                yrost = self.userlist[fromstripped].buddylist
                                 if config.dumpProtocol: print yrost
                                 for each in yrost.keys():
                                     for yid in yrost[each]:
@@ -317,17 +267,17 @@ class Transport:
                                 self.jabberqueue(m)
                                 if config.dumpProtocol: print m
                             else:
-                                for each in userlist[fromstripped].buddylist.keys():
-                                    for yid in userlist[fromstripped].buddylist[each]:
+                                for each in self.userlist[fromstripped].buddylist.keys():
+                                    for yid in self.userlist[fromstripped].buddylist[each]:
                                         self.jabberqueue(Presence(frm='%s@%s'%(YIDEncode(yid),config.jid),to = fromjid, typ='subscribe', status='Yahoo messenger contact'))
                             m = Presence(to = fromjid, frm = config.jid)
                             self.jabberqueue(m)
                             self.y_send_online(fromstripped)
-                            self.register_ymsg_handlers(userlist[fromstripped])
+                            self.register_ymsg_handlers(self.userlist[fromstripped])
                     else:
                         self.jabberqueue(Error(event,ERR_NOT_ACCEPTABLE))
                 elif event.getType() == 'subscribe':
-                    if userlist.has_key(fromstripped):
+                    if self.userlist.has_key(fromstripped):
                         if event.getTo() == config.jid:
                             conf = userfile[fromstripped]
                             conf['usubscribed']=True
@@ -335,7 +285,7 @@ class Transport:
                             userfile.sync()
                             m = Presence(to = fromjid, frm = config.jid, typ = 'subscribed')
                             self.jabberqueue(m)
-                        elif userlist[fromstripped].roster.has_key(yidenc):
+                        elif self.userlist[fromstripped].roster.has_key(yidenc):
                             m = Presence(to = fromjid, frm = event.getTo(), typ = 'subscribed')
                             self.jabberqueue(m)
                         else:
@@ -345,18 +295,18 @@ class Transport:
                                 status = event.getStatus().encode('utf-8')
                             else:
                                 status = ''
-                            self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_addbuddy(yidenc, status))
+                            self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_addbuddy(yidenc, status))
                             self.jabberqueue(Presence(frm=event.getTo(), to = event.getFrom(), typ = 'subscribed'))
                     else:
                         self.jabberqueue(Error(event,ERR_NOT_ACCEPTABLE))
                 elif event.getType() == 'unsubscribe':
-                    if userlist.has_key(fromstripped):
-                        if userlist[fromstripped].roster.has_key(yid):
+                    if self.userlist.has_key(fromstripped):
+                        if self.userlist[fromstripped].roster.has_key(yid):
                             if event.getStatus() != None:
                                 msg = event.getStatus().encode('utf-8')
                             else:
                                 msg = ''
-                            self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_delbuddy(yidenc, msg))
+                            self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_delbuddy(yidenc, msg))
                             self.jabberqueue(Presence(frm=event.getTo(), to = event.getFrom(), typ = 'unsubscribed'))
                     else:
                         self.jabberqueue(Error(event,ERR_NOT_ACCEPTABLE))
@@ -367,17 +317,17 @@ class Transport:
                     # code to add yahoo connection goes here
                     if yid != '':
                         return
-                    if userlist.has_key(fromstripped):
+                    if self.userlist.has_key(fromstripped):
                         # update status case and additional resource case
                         # update status case
-                        if userlist[fromstripped].xresources.has_key(event.getFrom().getResource()):
+                        if self.userlist[fromstripped].xresources.has_key(event.getFrom().getResource()):
                             #update resource record
-                            userlist[fromstripped].xresources[event.getFrom().getResource()]=(event.getShow(),event.getPriority(),event.getStatus(),userlist[fromstripped].xresources[event.getFrom().getResource()][3])
-                            if config.dumpProtocol: print "Update resource login: %s" % userlist[fromstripped].xresources
+                            self.userlist[fromstripped].xresources[event.getFrom().getResource()]=(event.getShow(),event.getPriority(),event.getStatus(),self.userlist[fromstripped].xresources[event.getFrom().getResource()][3])
+                            if config.dumpProtocol: print "Update resource login: %s" % self.userlist[fromstripped].xresources
                         else:
                             #new resource login
-                            userlist[fromstripped].xresources[event.getFrom().getResource()]=(event.getShow(),event.getPriority(),event.getStatus(),time.time())
-                            if config.dumpProtocol: print "New resource login: %s" % userlist[fromstripped].xresources
+                            self.userlist[fromstripped].xresources[event.getFrom().getResource()]=(event.getShow(),event.getPriority(),event.getStatus(),time.time())
+                            if config.dumpProtocol: print "New resource login: %s" % self.userlist[fromstripped].xresources
                             #send roster as is
                             self.y_send_online(fromstripped,event.getFrom().getResource())
                         #print fromstripped, event.getShow().encode('utf-8'), event.getStatus().encode('utf-8')
@@ -392,12 +342,12 @@ class Transport:
                             userfile.sync()
                             return
                         yobj = ylib.YahooCon(conf['username'].encode('utf-8'),conf['password'].encode('utf-8'), fromstripped,config.host,config.dumpProtocol)
-                        #userlist[fromstripped]=yobj
+                        #self.userlist[fromstripped]=yobj
                         s = yobj.connect()
                         if s != None:
                             rdsocketlist[s]=yobj
-                            userlist[yobj.fromjid]=yobj
-                            self.register_ymsg_handlers(userlist[fromstripped])
+                            self.userlist[yobj.fromjid]=yobj
+                            self.register_ymsg_handlers(self.userlist[fromstripped])
                             #self.yahooqueue(fromstripped,yobj.ymsg_send_challenge())
                             self.yahooqueue(fromstripped,yobj.ymsg_send_init())
                             yobj.event = event
@@ -416,23 +366,23 @@ class Transport:
                             self.jabberqueue(Error(event,ERR_REMOTE_SERVER_TIMEOUT))
                 elif event.getType() == 'unavailable':
                     # Match resources and remove the newly unavailable one
-                    if userlist.has_key(fromstripped):
+                    if self.userlist.has_key(fromstripped):
                         #print 'Resource: ', event.getFrom().getResource(), "To Node: ",yid
                         if yid =='':
                             self.y_send_offline(fromstripped,event.getFrom().getResource())
-                            if userlist[fromstripped].xresources.has_key(event.getFrom().getResource()):
-                                del userlist[fromstripped].xresources[event.getFrom().getResource()]
+                            if self.userlist[fromstripped].xresources.has_key(event.getFrom().getResource()):
+                                del self.userlist[fromstripped].xresources[event.getFrom().getResource()]
                                 self.xmpp_presence_do_update(event,fromstripped)
                             #Single resource case
-                            #print userlist[fromstripped].xresources
-                            if userlist[fromstripped].xresources == {}:
+                            #print self.userlist[fromstripped].xresources
+                            if self.userlist[fromstripped].xresources == {}:
                                 if config.dumpProtocol: print 'No more resource logins'
-                                yobj=userlist[fromstripped]
+                                yobj=self.userlist[fromstripped]
                                 if yobj.pripingobj in timerlist:
                                     timerlist.remove(yobj.pripingobj)
                                 if yobj.secpingobj in timerlist:
                                     timerlist.remove(yobj.secpingobj)
-                                del userlist[yobj.fromjid]
+                                del self.userlist[yobj.fromjid]
                                 if rdsocketlist.has_key(yobj.sock):
                                     del rdsocketlist[yobj.sock]
                                 if wrsocketlist.has_key(yobj.sock):
@@ -445,33 +395,33 @@ class Transport:
                 yid = RoomDecode(event.getTo().getNode())
                 yidenc = yid.encode('utf-8')
                 #Need to move Chatpings into this section for Yahoo rooms.
-                if userlist.has_key(fromstripped):
-                    if userlist[fromstripped].connok:
+                if self.userlist.has_key(fromstripped):
+                    if self.userlist[fromstripped].connok:
                         if config.dumpProtocol: print "chat presence"
-                        userlist[fromstripped].roomnames[yid.lower()] = yid
+                        self.userlist[fromstripped].roomnames[yid.lower()] = yid
                         if event.getType() == 'available' or event.getType() == None or event.getType() == '':
                             nick = event.getTo().getResource()
-                            userlist[fromstripped].nick = nick
-                            if not userlist[fromstripped].chatlogin:
-                                self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_conflogon())
-                                self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_chatlogin(None))
-                                userlist[fromstripped].chatresource = event.getFrom().getResource()
+                            self.userlist[fromstripped].nick = nick
+                            if not self.userlist[fromstripped].chatlogin:
+                                self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_conflogon())
+                                self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_chatlogin(None))
+                                self.userlist[fromstripped].chatresource = event.getFrom().getResource()
                                 #Add secondary ping object code
                                 freq = 5 * 60 #Secondary ping frequency from Zinc
                                 offset = int(time.time())%freq
-                                userlist[fromstripped].confpingtime = time.time()
-                                userlist[fromstripped].confpingobj=(freq,offset,self.yahooqueue,[userlist[fromstripped].fromjid, userlist[fromstripped].ymsg_send_confping()])
-                                timerlist.append(userlist[fromstripped].confpingobj)
-                                userlist[fromstripped].roomtojoin = yidenc
+                                self.userlist[fromstripped].confpingtime = time.time()
+                                self.userlist[fromstripped].confpingobj=(freq,offset,self.yahooqueue,[self.userlist[fromstripped].fromjid, self.userlist[fromstripped].ymsg_send_confping()])
+                                timerlist.append(self.userlist[fromstripped].confpingobj)
+                                self.userlist[fromstripped].roomtojoin = yidenc
                             else:
-                                self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_chatjoin(yidenc))
+                                self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_chatjoin(yidenc))
                         elif event.getType() == 'unavailable':
                             # Must add code to compare from resources here
-                            self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_chatleave(yidenc))
-                            self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_chatlogout())
-                            self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_conflogoff())
-                            if userlist[fromstripped].confpingobj in timerlist:
-                                timerlist.remove(userlist[fromstripped].confpingobj)
+                            self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_chatleave(yidenc))
+                            self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_chatlogout())
+                            self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_conflogoff())
+                            if self.userlist[fromstripped].confpingobj in timerlist:
+                                timerlist.remove(self.userlist[fromstripped].confpingobj)
                         else:
                             self.jabberqueue(Error(event,ERR_FEATURE_NOT_IMPLEMENTED))
                     else:
@@ -496,38 +446,38 @@ class Transport:
         age =None
         priority = None
         resource = None
-        for each in userlist[fromstripped].xresources.keys():
-            #print each,userlist[fromstripped].xresources
-            if userlist[fromstripped].xresources[each][1]>priority:
+        for each in self.userlist[fromstripped].xresources.keys():
+            #print each,self.userlist[fromstripped].xresources
+            if self.userlist[fromstripped].xresources[each][1]>priority:
                 #if priority is higher then take the highest
-                age = userlist[fromstripped].xresources[each][3]
-                priority = userlist[fromstripped].xresources[each][1]
+                age = self.userlist[fromstripped].xresources[each][3]
+                priority = self.userlist[fromstripped].xresources[each][1]
                 resource = each
-            elif userlist[fromstripped].xresources[each][1]==priority:
+            elif self.userlist[fromstripped].xresources[each][1]==priority:
                 #if priority is the same then take the oldest
-                if userlist[fromstripped].xresources[each][3]<age:
-                    age = userlist[fromstripped].xresources[each][3]
-                    priority = userlist[fromstripped].xresources[each][1]
+                if self.userlist[fromstripped].xresources[each][3]<age:
+                    age = self.userlist[fromstripped].xresources[each][3]
+                    priority = self.userlist[fromstripped].xresources[each][1]
                     resource = each
         if resource == event.getFrom().getResource():
             #only update shown status if resource is current datasource
             if event.getShow() == None:
                 if event.getStatus() != None:
-                    self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_away(None,event.getStatus()))
-                elif userlist[fromstripped].away == None:
-                    self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_back())
-            elif event.getShow() == None and userlist[fromstripped].away != None:
-                self.yahooqueue(fromstripped,userlist[fromstripped].ymsg_send_away(None,event.getStatus()))
-                userlist[fromstripped].away = None
+                    self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_away(None,event.getStatus()))
+                elif self.userlist[fromstripped].away == None:
+                    self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_back())
+            elif event.getShow() == None and self.userlist[fromstripped].away != None:
+                self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_away(None,event.getStatus()))
+                self.userlist[fromstripped].away = None
             elif event.getShow() == 'xa' or event.getShow() == 'away':
-                self.yahooqueue(fromstripped, userlist[fromstripped].ymsg_send_away('away',event.getStatus()))
-                userlist[fromstripped].away = 'away'
+                self.yahooqueue(fromstripped, self.userlist[fromstripped].ymsg_send_away('away',event.getStatus()))
+                self.userlist[fromstripped].away = 'away'
             elif event.getShow() == 'dnd':
-                self.yahooqueue(fromstripped, userlist[fromstripped].ymsg_send_away('dnd',event.getStatus()))
-                userlist[fromstripped].away= 'dnd'
+                self.yahooqueue(fromstripped, self.userlist[fromstripped].ymsg_send_away('dnd',event.getStatus()))
+                self.userlist[fromstripped].away= 'dnd'
             elif event.getType() == 'invisible':
-                self.yahooqueue(fromstripped, userlist[fromstripped].ymsg_send_away('invisible',None))
-                userlist[fromstripped].away= 'invisible'
+                self.yahooqueue(fromstripped, self.userlist[fromstripped].ymsg_send_away('invisible',None))
+                self.userlist[fromstripped].away= 'invisible'
 
     def xmpp_iq_notimplemented(self, con, event):
         self.jabberqueue(Error(event,ERR_FEATURE_NOT_IMPLEMENTED))
@@ -569,8 +519,8 @@ class Transport:
                     return {'ids':[],'features':[]}
                 if type == 'items':
                     list = []
-                    if userlist.has_key(fromstripped):
-                        for yid in userlist[fromstripped].roster.keys():
+                    if self.userlist.has_key(fromstripped):
+                        for yid in self.userlist[fromstripped].roster.keys():
                             list.append({'jid':'%s@%s' %(YIDEncode(yid),config.jid),'name':yid})
                     return list
             elif node.startswith(NODE_ADMIN_REGISTERED_USERS):
@@ -599,7 +549,7 @@ class Transport:
                     nodeinfo = node.split('/')
                     list = []
                     if len(nodeinfo) == 1:
-                        for each in userlist.keys():
+                        for each in self.userlist.keys():
                             #list.append({'node':'/'.join([NODE_ADMIN_ONLINE_USERS, each]),'name':each,'jid':config.jid})
                             list.append({'name':each,'jid':each})
                     #elif len(nodeinfo) == 2:
@@ -611,10 +561,10 @@ class Transport:
                 self.jabber.send(Error(event,ERR_ITEM_NOT_FOUND))
                 raise NodeProcessed
         elif to.getDomain() == config.jid:
-            if userlist.has_key(fromstripped):
+            if self.userlist.has_key(fromstripped):
                 yid = YIDDecode(event.getTo().getNode())
                 if type == 'info':
-                    if userlist[fromstripped].roster.has_key(yid):
+                    if self.userlist[fromstripped].roster.has_key(yid):
                         features = [NS_VCARD,NS_VERSION]
                         if userfile[fromstripped.encode('utf-8')].has_key('avatar'):
                             if userfile[fromstripped.encode('utf-8')]['avatar'].has_key(yid):
@@ -626,7 +576,7 @@ class Transport:
                     else:
                         self.jabberqueue(Error(event,ERR_NOT_ACCEPTABLE))
                 if type == 'items':
-                    if userlist[fromstripped].roster.has_key(yid):
+                    if self.userlist[fromstripped].roster.has_key(yid):
                         return []
             else:
                 self.jabberqueue(Error(event,ERR_NOT_ACCEPTABLE))
@@ -718,7 +668,7 @@ class Transport:
                 return []
 
     def xmpp_iq_discoinfo_results(self, con, event):
-        discoresults[event.getFrom().getStripped().encode('utf8')]=event
+        self.discoresults[event.getFrom().getStripped().encode('utf8')]=event
         raise NodeProcessed
 
     def xmpp_iq_register_get(self, con, event):
@@ -776,17 +726,17 @@ class Transport:
                 userfile.sync()
                 m=event.buildReply('result')
                 self.jabberqueue(m)
-                if userlist.has_key(fromjid):
-                    self.y_closed(userlist[fromjid])
-                if not userlist.has_key(fromjid):
+                if self.userlist.has_key(fromjid):
+                    self.y_closed(self.userlist[fromjid])
+                if not self.userlist.has_key(fromjid):
                     yobj = ylib.YahooCon(username.encode('utf-8'),password.encode('utf-8'), fromjid,config.host,config.dumpProtocol)
-                    userlist[fromjid]=yobj
+                    self.userlist[fromjid]=yobj
                     if config.dumpProtocol: print "try connect"
                     s = yobj.connect()
                     if s != None:
                         if config.dumpProtocol: print "conect made"
                         rdsocketlist[s]=yobj
-                        userlist[fromjid]=yobj
+                        self.userlist[fromjid]=yobj
                         self.yahooqueue(fromjid,yobj.ymsg_send_challenge())
                     yobj.handlers['login']=self.y_reg_login
                     yobj.handlers['loginfail']=self.y_reg_loginfail
@@ -796,8 +746,8 @@ class Transport:
                     yobj.showstatus = None
                     yobj.away = None
             elif remove and not username and not password:
-                if userlist.has_key(fromjid):
-                    self.y_closed(userlist[fromjid])
+                if self.userlist.has_key(fromjid):
+                    self.y_closed(self.userlist[fromjid])
                 if userfile.has_key(fromjid):
                     del userfile[fromjid]
                     userfile.sync()
@@ -903,7 +853,7 @@ class Transport:
             self.y_online(yobj,yid,forceavatar=1)
 
     def y_closed(self, yobj):
-        if userlist.has_key(yobj.fromjid):
+        if self.userlist.has_key(yobj.fromjid):
             if not yobj.connok:
                 if config.dumpProtocol: print "got closed, on not connok"
                 if yobj.moreservers():
@@ -915,7 +865,7 @@ class Transport:
                     s= yobj.connect()
                     if s != None:
                         rdsocketlist[s]=yobj
-                        userlist[yobj.fromjid]=yobj
+                        self.userlist[yobj.fromjid]=yobj
                         self.yahooqueue(yobj.fromjid,yobj.ymsg_send_challenge())
                         return # this method terminates here - all change please
                 else:
@@ -928,8 +878,8 @@ class Transport:
                 timerlist.remove(yobj.secpingobj)
             if 'confpingobj' in dir(yobj) and yobj.confpingobj in timerlist:
                 timerlist.remove(yobj.confpingobj)
-            if userlist.has_key(yobj.fromjid):
-                del userlist[yobj.fromjid]
+            if self.userlist.has_key(yobj.fromjid):
+                del self.userlist[yobj.fromjid]
             if rdsocketlist.has_key(yobj.sock):
                 del rdsocketlist[yobj.sock]
             if wrsocketlist.has_key(yobj.sock):
@@ -979,7 +929,7 @@ class Transport:
             s = yobj.connect()
             if s != None:
                 rdsocketlist[s]=yobj
-                userlist[yobj.fromjid]=yobj
+                self.userlist[yobj.fromjid]=yobj
                 self.yahooqueue(yobj.fromjid,yobj.ymsg_send_challenge())
                 return # this method terminates here - all change please
         else:
@@ -1004,7 +954,7 @@ class Transport:
                             s = yobj.connect()
                             if s != None:
                                 rdsocketlist[s]=yobj
-                                userlist[yobj.fromjid]=yobj
+                                self.userlist[yobj.fromjid]=yobj
                                 self.yahooqueue(yobj.fromjid,yobj.ymsg_send_challenge())
                                 self.jabberqueue(Message(to=yobj.event.getFrom(),frm=config.jid,subject='Login Failure',body='Login Failed to Yahoo! service. Please check registration details by re-registering in your client. You have an @ in your username, login will be attempted without the domain component.'))
                                 return
@@ -1015,7 +965,7 @@ class Transport:
             else:
                 self.jabberqueue(Message(to=yobj.event.getFrom(),frm=config.jid,subject='Login Failure',body='Login Failed to Yahoo! service. Please check registration details by re-registering in your client'))
             self.jabberqueue(Error(yobj.event,ERR_NOT_AUTHORIZED))
-            del userlist[yobj.fromjid]
+            del self.userlist[yobj.fromjid]
             if rdsocketlist.has_key(yobj.sock):
                 del rdsocketlist[yobj.sock]
             if wrsocketlist.has_key(yobj.sock):
@@ -1136,12 +1086,12 @@ class Transport:
             s= yobj.connect()
             if s != None:
                 rdsocketlist[s]=yobj
-                userlist[yobj.fromjid]=yobj
+                self.userlist[yobj.fromjid]=yobj
                 self.yahooqueue(yobj.fromjid,yobj.ymsg_send_challenge())
                 return # this method terminates here - all change please
         # registration login failure handler
         self.jabberqueue(Error(yobj.event,ERR_NOT_ACCEPTABLE)) # will not work, no event object
-        del userlist[yobj.fromjid]
+        del self.userlist[yobj.fromjid]
         if rdsocketlist.has_key(yobj.sock):
             del rdsocketlist[yobj.sock]
         if wrsocketlist.has_key(yobj.sock):
@@ -1150,77 +1100,77 @@ class Transport:
         del yobj
 
     def y_send_online(self,fromjid,resource=None):
-        if config.dumpProtocol: print fromjid,userlist[fromjid].roster
+        if config.dumpProtocol: print fromjid,self.userlist[fromjid].roster
         fromstripped = fromjid
         if resource != None:
             fromjid = JID(fromjid)
             fromjid.setResource(resource)
         self.jabberqueue(Presence(to=fromjid,frm = config.jid))
-        for yid in userlist[fromstripped].roster:
-            if userlist[fromstripped].roster[yid][0] == 'available':
+        for yid in self.userlist[fromstripped].roster:
+            if self.userlist[fromstripped].roster[yid][0] == 'available':
                 self.jabberqueue(Presence(frm = '%s@%s/messenger' % (YIDEncode(yid),config.jid), to = fromjid))
 
     def y_send_offline(self,fromjid,resource=None,status=None):
-        if config.dumpProtocol: print fromjid,userlist[fromjid].roster
+        if config.dumpProtocol: print fromjid,self.userlist[fromjid].roster
         fromstripped = fromjid
         if resource != None:
             fromjid = JID(fromjid)
             fromjid.setResource(resource)
         self.jabberqueue(Presence(to=fromjid,frm = config.jid, typ='unavailable',status=status))
-        for yid in userlist[fromstripped].roster:
-            if userlist[fromstripped].roster[yid][0] == 'available':
+        for yid in self.userlist[fromstripped].roster:
+            if self.userlist[fromstripped].roster[yid][0] == 'available':
                 self.jabberqueue(Presence(frm = '%s@%s/messenger' % (YIDEncode(yid),config.jid), to = fromjid, typ='unavailable'))
                 self.jabberqueue(Presence(frm = '%s@%s/chat' % (YIDEncode(yid),config.jid), to = fromjid, typ='unavailable'))
 
     #chat room functions
     def y_chat_login(self,fromjid):
-        userlist[fromjid].chatlogin=True
-        self.yahooqueue(fromjid,userlist[fromjid].ymsg_send_chatjoin(userlist[fromjid].roomtojoin))
-        del userlist[fromjid].roomtojoin
+        self.userlist[fromjid].chatlogin=True
+        self.yahooqueue(fromjid,self.userlist[fromjid].ymsg_send_chatjoin(self.userlist[fromjid].roomtojoin))
+        del self.userlist[fromjid].roomtojoin
 
     def y_chat_roominfo(self,fromjid,info):
-        if not userlist[fromjid].roomlist.has_key(info['room']):
-            userlist[fromjid].roomlist[info['room']]={'byyid':{},'bynick':{},'info':info}
+        if not self.userlist[fromjid].roomlist.has_key(info['room']):
+            self.userlist[fromjid].roomlist[info['room']]={'byyid':{},'bynick':{},'info':info}
             self.jabberqueue(Presence(frm = '%s@%s' %(RoomEncode(info['room']),config.confjid),to=fromjid))
             self.jabberqueue(Message(frm = '%s@%s' %(RoomEncode(info['room']),config.confjid),to=fromjid, typ='groupchat', subject= info['topic']))
 
     def y_chat_join(self,fromjid,room,info):
-        if userlist[fromjid].roomlist.has_key(room):
-            if not userlist[fromjid].roomlist[room]['byyid'].has_key(info['yip']):
-                userlist[fromjid].roomlist[room]['byyid'][info['yip']] = info
+        if self.userlist[fromjid].roomlist.has_key(room):
+            if not self.userlist[fromjid].roomlist[room]['byyid'].has_key(info['yip']):
+                self.userlist[fromjid].roomlist[room]['byyid'][info['yip']] = info
                 if not info.has_key('nick'):
                     info['nick'] = info['yip']
                 tojid = JID(fromjid)
-                tojid.setResource(userlist[fromjid].chatresource)
-                #print info['yip'],userlist[fromjid].username
-                if info['yip'] == userlist[fromjid].username:
+                tojid.setResource(self.userlist[fromjid].chatresource)
+                #print info['yip'],self.userlist[fromjid].username
+                if info['yip'] == self.userlist[fromjid].username:
                     jid = tojid
-                    if config.dumpProtocol: print info['nick'], userlist[fromjid].nick
-                    if info['nick'] != userlist[fromjid].nick:
+                    if config.dumpProtocol: print info['nick'], self.userlist[fromjid].nick
+                    if info['nick'] != self.userlist[fromjid].nick:
                         # join room with wrong nick
-                        p = Presence(to = tojid, frm = '%s@%s/%s' % (RoomEncode(room),config.confjid,userlist[fromjid].nick))
-                        p.addChild(node=MucUser(jid = jid, nick = userlist[fromjid].nick, role = 'participant', affiliation = 'none'))
+                        p = Presence(to = tojid, frm = '%s@%s/%s' % (RoomEncode(room),config.confjid,self.userlist[fromjid].nick))
+                        p.addChild(node=MucUser(jid = jid, nick = self.userlist[fromjid].nick, role = 'participant', affiliation = 'none'))
                         self.jabberqueue(p)
                         # then leave/change to the right nick
-                        p = Presence(to = tojid, frm = '%s@%s/%s' % (RoomEncode(room),config.confjid,userlist[fromjid].nick), typ='unavailable')
+                        p = Presence(to = tojid, frm = '%s@%s/%s' % (RoomEncode(room),config.confjid,self.userlist[fromjid].nick), typ='unavailable')
                         p.addChild(node=MucUser(jid = jid, nick = info['nick'], role = 'participant', affiliation = 'none', status = 303))
                         self.jabberqueue(p)
-                        userlist[fromjid].nick = info['nick']
+                        self.userlist[fromjid].nick = info['nick']
                 else:
                     jid = '%s@%s' % (YIDEncode(info['yip']),config.jid)
-                userlist[fromjid].roomlist[room]['bynick'][info['nick']]= info['yip']
+                self.userlist[fromjid].roomlist[room]['bynick'][info['nick']]= info['yip']
                 self.jabberqueue(Presence(frm = '%s@%s/%s' % (RoomEncode(room),config.confjid,info['nick']), to = tojid, payload=[MucUser(role='participant',affiliation='none',jid = jid)]))
 
     def y_chat_leave(self,fromjid,room,yid,nick):
         # Need to add some cleanup code
         #
         #
-        if userlist[fromjid].roomlist.has_key(room):
-            if userlist[fromjid].roomlist[room]['byyid'].has_key(yid):
-                del userlist[fromjid].roomlist[room]['bynick'][userlist[fromjid].roomlist[room]['byyid'][yid]['nick']]
-                del userlist[fromjid].roomlist[room]['byyid'][yid]
+        if self.userlist[fromjid].roomlist.has_key(room):
+            if self.userlist[fromjid].roomlist[room]['byyid'].has_key(yid):
+                del self.userlist[fromjid].roomlist[room]['bynick'][self.userlist[fromjid].roomlist[room]['byyid'][yid]['nick']]
+                del self.userlist[fromjid].roomlist[room]['byyid'][yid]
                 jid = JID(fromjid)
-                jid.setResource(userlist[fromjid].chatresource)
+                jid.setResource(self.userlist[fromjid].chatresource)
                 self.jabberqueue(Presence(frm = '%s@%s/%s' % (RoomEncode(room),config.confjid,nick), to= jid, typ = 'unavailable'))
 
     def xmpp_iq_version(self, con, event):
@@ -1247,13 +1197,13 @@ class Transport:
         return connected
 
     def xmpp_disconnect(self):
-        for each in userlist.keys():
-            yobj=userlist[each]
+        for each in self.userlist.keys():
+            yobj=self.userlist[each]
             if yobj.pripingobj in timerlist:
                 timerlist.remove(yobj.pripingobj)
             if yobj.secpingobj in timerlist:
                 timerlist.remove(yobj.secpingobj)
-            del userlist[yobj.fromjid]
+            del self.userlist[yobj.fromjid]
             if rdsocketlist.has_key(yobj.sock):
                 del rdsocketlist[yobj.sock]
             if wrsocketlist.has_key(yobj.sock):
@@ -1388,8 +1338,8 @@ if __name__ == '__main__':
                     apply(each[2],each[3])
                 except:
                     logError()
-    for each in [x for x in userlist.keys()]:
-        userlist[each].connok = True
+    for each in [x for x in transport.userlist.keys()]:
+        transport.userlist[each].connok = True
         transport.y_send_offline(each, status = transport.offlinemsg)
     del rdsocketlist[connection.Connection._sock]
     if wrsocketlist.has_key(connection.Connection._sock):
