@@ -490,10 +490,13 @@ class Transport:
         if to == config.jid:
             if node == None:
                 if type == 'info':
+                    features = [NS_VERSION,NS_COMMANDS,NS_AVATAR]
+                    if config.allowRegister:
+                        features = [NS_REGISTER] + features
                     return {
                         'ids':[
                             {'category':'gateway','type':'yahoo','name':VERSTR}],
-                        'features':[NS_REGISTER,NS_VERSION,NS_COMMANDS,NS_AVATAR]}
+                        'features':features}
                 if type == 'items':
                     list = [
                         {'node':NODE_ROSTER,'name':config.discoName + ' Roster','jid':config.jid}]
@@ -670,6 +673,8 @@ class Transport:
         raise NodeProcessed
 
     def xmpp_iq_register_get(self, con, event):
+        if not config.allowRegister:
+            return
         if event.getTo() == config.jid:
             username = []
             password = []
@@ -692,6 +697,8 @@ class Transport:
         raise NodeProcessed
 
     def xmpp_iq_register_set(self, con, event):
+        if not config.allowRegister:
+            return
         if event.getTo() == config.jid:
             remove = False
             username = False
