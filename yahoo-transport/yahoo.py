@@ -464,10 +464,8 @@ class Transport:
             if event.getShow() == None:
                 if event.getStatus() != None:
                     self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_away(None,event.getStatus()))
-                elif self.userlist[fromstripped].away == None:
+                else:
                     self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_back())
-            elif event.getShow() == None and self.userlist[fromstripped].away != None:
-                self.yahooqueue(fromstripped,self.userlist[fromstripped].ymsg_send_away(None,event.getStatus()))
                 self.userlist[fromstripped].away = None
             elif event.getShow() == 'xa' or event.getShow() == 'away':
                 self.yahooqueue(fromstripped, self.userlist[fromstripped].ymsg_send_away('away',event.getStatus()))
