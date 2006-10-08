@@ -16,7 +16,6 @@ port = "5347"
 secret = "secret"
 
 allowRegister = False
-enableChatrooms = False
 
 admins = []
 
