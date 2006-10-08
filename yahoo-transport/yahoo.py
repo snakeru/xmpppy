@@ -36,7 +36,7 @@ def YIDEncode(yid):
     return yid.replace('@','%')
 
 def YIDDecode(yid):
-    return yid.replace('%','@')
+    return '@'.join(yid.rsplit('%',1))
 
 roomenccodere = re.compile('([^-]?)([A-Z-])')
 def RoomEncode(yid):
@@ -801,8 +801,8 @@ class Transport:
             query = event.getTag('query')
             jid = query.getTagData('prompt')
             m = Iq(to = event.getFrom(), frm=event.getTo(), typ = 'result', queryNS=NS_GATEWAY, payload=[
-                Node('jid',payload='%s@%s'%(jid,config.jid)),     # JEP-0100 says use jid,
-                Node('prompt',payload='%s@%s'%(jid,config.jid))]) # but Psi uses prompt
+                Node('jid',payload='%s@%s'%(YIDEncode(jid),config.jid)),     # JEP-0100 says use jid,
+                Node('prompt',payload='%s@%s'%(YIDEncode(jid),config.jid))]) # but Psi uses prompt
             m.setID(event.getID())
             self.jabberqueue(m)
             raise NodeProcessed
