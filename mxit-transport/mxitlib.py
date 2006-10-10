@@ -32,10 +32,11 @@ class MXitCon:
     # login -- on sucessful login
     # loginfail -- on login failure
 
-    def __init__(self, username, password, fromjid,fromhost,dumpProtocol):
+    def __init__(self, username, password, clientid, fromjid,fromhost,dumpProtocol):
         self.username = username
         self.session = username
         self.password = password
+        self.clientkey = clientid[2:int(clientid[:2],16)+2]
         self.fromhost = fromhost
         self.fromjid = fromjid
         self.roster = {}
@@ -148,7 +149,7 @@ class MXitCon:
             self.handlers['message'](self, pay[2][0], pay[3].split('\x02')[0], pay[2][1])
 
     def mxit_send_login(self):
-        pay = mxit_mkargu({'ms':[self.password,'E-5.0.3-J-j2me',1,'','80208ad4-6c61-460b-98cd-daad5c0c5389','255','27'],'cr':'v5_6'})
+        pay = mxit_mkargu({'ms':[self.password,'E-5.0.3-J-j2me',1,'',self.clientkey,'255','27'],'cr':'v5_6'})
         hdr = mxit_mkhdr(len(pay),M_login,0,self.session)
         pkt = hdr + pay
         return pkt

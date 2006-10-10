@@ -266,7 +266,7 @@ class Transport:
                             del userfile[fromstripped]
                             userfile.sync()
                             return
-                        mxitobj = mxitlib.MXitCon(conf['username'].encode('utf-8'),conf['password'].encode('utf-8'), fromstripped,config.host,config.dumpProtocol)
+                        mxitobj = mxitlib.MXitCon(conf['username'].encode('utf-8'),conf['password'].encode('utf-8'),conf['clientid'].encode('utf-8'), fromstripped,config.host,config.dumpProtocol)
                         #self.userlist[fromstripped]=mxitobj
                         s = mxitobj.connect()
                         if s != None:
@@ -359,7 +359,7 @@ class Transport:
             if node == None:
                 if type == 'info':
                     features = [NS_VERSION,NS_COMMANDS,NS_AVATAR]
-                    if config.allowRegister:
+                    if config.allowRegister or userfile.has_key(fromjid):
                         features = [NS_REGISTER] + features
                     return {
                         'ids':[
@@ -453,21 +453,29 @@ class Transport:
         raise NodeProcessed
 
     def xmpp_iq_register_get(self, con, event):
-        if not config.allowRegister:
-            return
         if event.getTo() == config.jid:
             username = []
             password = []
+            clientid = []
             fromjid = event.getFrom().getStripped().encode('utf8')
             if userfile.has_key(fromjid):
                 try:
                     username = userfile[fromjid]['username']
                     password = userfile[fromjid]['password']
+                    clientid = userfile[fromjid]['clientid']
                 except:
                     pass
+            else:
+                if not config.allowRegister:
+                    return
             m = event.buildReply('result')
             m.setQueryNS(NS_REGISTER)
-            m.setQueryPayload([Node('instructions', payload = 'Please provide your MXit username and password'),Node('username',payload=username),Node('password',payload=password),Node('registered')])
+            m.setQueryPayload([
+                Node('instructions', payload = 'Please provide your MXit username and password'),
+                Node('username',payload=username),
+                Node('password',payload=password),
+                Node('misc',payload=clientid),
+                Node('registered')])
             self.jabberqueue(m)
             #Add disco#info check to client requesting for rosterx support
             i= Iq(to=event.getFrom(), frm=config.jid, typ='get',queryNS=NS_DISCO_INFO)
@@ -477,12 +485,11 @@ class Transport:
         raise NodeProcessed
 
     def xmpp_iq_register_set(self, con, event):
-        if not config.allowRegister:
-            return
         if event.getTo() == config.jid:
             remove = False
             username = False
             password = False
+            clientid = False
             fromjid = event.getFrom().getStripped().encode('utf8')
             #for each in event.getQueryPayload():
             #    if each.getName() == 'username':
@@ -498,15 +505,21 @@ class Transport:
                 username = query.getTagData('username')
             if query.getTag('password'):
                 password = query.getTagData('password')
+            if query.getTag('misc'):
+                clientid = query.getTagData('misc')
+                clientid = clientid.strip().split(' ')[-1]
             if query.getTag('remove'):
                remove = True
-            if not remove and username and password:
+            if not remove and username and password and clientid:
                 if userfile.has_key(fromjid):
                     conf = userfile[fromjid]
                 else:
+                    if not config.allowRegister:
+                        return
                     conf = {}
                 conf['username']=username
                 conf['password']=password
+                conf['clientid']=clientid
                 userfile[fromjid]=conf
                 userfile.sync()
                 m=event.buildReply('result')
@@ -514,7 +527,7 @@ class Transport:
                 if self.userlist.has_key(fromjid):
                     self.mxit_closed(self.userlist[fromjid])
                 if not self.userlist.has_key(fromjid):
-                    mxitobj = mxitlib.MXitCon(username.encode('utf-8'),password.encode('utf-8'), fromjid,config.host,config.dumpProtocol)
+                    mxitobj = mxitlib.MXitCon(username.encode('utf-8'),password.encode('utf-8'),conf['clientid'].encode('utf-8'), fromjid,config.host,config.dumpProtocol)
                     self.userlist[fromjid]=mxitobj
                     if config.dumpProtocol: print "try connect"
                     s = mxitobj.connect()
@@ -529,7 +542,7 @@ class Transport:
                     mxitobj.event = event
                     mxitobj.showstatus = None
                     mxitobj.away = None
-            elif remove and not username and not password:
+            elif remove and not username and not password and not clientid:
                 if self.userlist.has_key(fromjid):
                     self.mxit_closed(self.userlist[fromjid])
                 if userfile.has_key(fromjid):
@@ -690,6 +703,7 @@ class Transport:
         if config.dumpProtocol: print "got reg login"
         #m = mxitobj.event.buildReply('result')
         #self.jabberqueue(m)
+        mxitobj.connok = True
         self.jabberqueue(Presence(to=mxitobj.event.getFrom(),frm=mxitobj.event.getTo(),typ=mxitobj.event.getType()))
         self.jabberqueue(Presence(typ='subscribe',to=mxitobj.fromjid, frm=config.jid))
 
@@ -708,6 +722,7 @@ class Transport:
                 self.mxitqueue(mxitobj.fromjid,mxitobj.mxit_send_login())
                 return # this method terminates here - all change please
         # registration login failure handler
+        self.jabberqueue(Message(to=mxitobj.event.getFrom(),frm=config.jid,subject='Registration Failure',body='Login Failed to MXit service. %s'%reason))
         self.jabberqueue(Error(mxitobj.event,ERR_NOT_ACCEPTABLE)) # will not work, no event object
         del self.userlist[mxitobj.fromjid]
         if rdsocketlist.has_key(mxitobj.sock):
