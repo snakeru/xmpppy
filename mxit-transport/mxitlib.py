@@ -174,8 +174,9 @@ class MXitCon:
             msg = ''
         bgroup = 'jabber_yt'
         for group in self.buddylist.keys():
-            if (jid,nick) in self.buddylist[group]:
-                bgroup = group
+            for (bjid,bnick) in self.buddylist[group]:
+                if bnick == nick in self.buddylist[group]:
+                    bgroup = group
         #TODO
         #pay = mxit_mkargu({1:self.username,7:nick,65:bgroup,14:msg})
         #hdr = mxit_mkhdr(len(pay), M_rosterdel,0,self.session)
