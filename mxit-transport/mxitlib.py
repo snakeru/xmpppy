@@ -85,15 +85,17 @@ class MXitCon:
     def mxit_parsebuddies(self,list):
         #if self.dumpProtocol: print "Before: ",self.roster
         for each in list:
-            if type(each) != type([]):
-                return
-            #if self.dumpProtocol: print 'buddy',repr(each)
-            [group, jid, nick, hidenumber, xport] = each
-            if not self.buddylist.has_key(group):
-                self.buddylist[group] = []
-            self.buddylist[group].append((jid,nick))
-            if not self.roster.has_key(jid):
-                self.roster[jid]=('unavailable',None, None)
+            if self.dumpProtocol: print 'buddy',repr(each)
+            if type(each) == type([]):
+                if len(each) == 5:
+                    [group, jid, nick, hidenumber, xport] = each
+                    if not self.buddylist.has_key(group):
+                        self.buddylist[group] = []
+                    self.buddylist[group].append((jid,nick))
+                    if not self.roster.has_key(jid):
+                        self.roster[jid]=('unavailable',None, None)
+                elif len(each) == 4:
+                    pass #invite
         #if self.dumpProtocol: print "After: ", self.roster
 
     # decoding handlers
