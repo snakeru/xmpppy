@@ -114,24 +114,26 @@ class MXitCon:
     def mxit_online(self,hdr,pay):
         for each in pay[2:-1]:
             if self.dumpProtocol: print 'online',repr(each)
-            [group, jid, nick, status, xport] = each
-            if status != '0':
-                typ = None
-                if status == '2':
-                    typ = 'away'
-                elif status == '4':
-                    typ = 'dnd'
-                elif status == '5':
-                    typ = 'xa'
-                elif status == '7':
-                    typ = 'invisible'
-                self.roster[jid]=('available', typ, nick)
-                if self.handlers.has_key('online'):
-                    self.handlers['online'](self,jid)
-            else:
-                self.roster[jid]=('unavailable', None, None)
-                if self.handlers.has_key('offline'):
-                    self.handlers['offline'](self,jid)
+            if type(each) == type([]):
+                if len(each) == 5:
+                    [group, jid, nick, status, xport] = each
+                    if status != '0':
+                        typ = None
+                        if status == '2':
+                            typ = 'away'
+                        elif status == '4':
+                            typ = 'dnd'
+                        elif status == '5':
+                            typ = 'xa'
+                        elif status == '7':
+                            typ = 'invisible'
+                        self.roster[jid]=('available', typ, nick)
+                        if self.handlers.has_key('online'):
+                            self.handlers['online'](self,jid)
+                    else:
+                        self.roster[jid]=('unavailable', None, None)
+                        if self.handlers.has_key('offline'):
+                            self.handlers['offline'](self,jid)
 
     def mxit_roster(self,hdr,pay):
         if pay[0].has_key(3):
