@@ -36,7 +36,7 @@ def YIDEncode(yid):
     return yid.replace('@','%')
 
 def YIDDecode(yid):
-    return '@'.join(yid.rsplit('%',1))
+    return yid.replace('%','@')
 
 roomenccodere = re.compile('([^-]?)([A-Z-])')
 def RoomEncode(yid):
