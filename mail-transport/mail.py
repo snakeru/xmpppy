@@ -5,6 +5,7 @@ version = 'CVS ' + '$Revision$'.split()[1]
 import email, os, signal, smtplib, sys, time, traceback, xmpp
 from xmpp.browser import *
 from email.MIMEText import MIMEText
+from email.Header import decode_header
 import config, xmlconfig
 
 class Transport:
@@ -97,10 +98,10 @@ class Transport:
             if mfrom:
                 subject = event.getSubject()
                 body = event.getBody()
-                
+
                 charset = 'utf-8'
                 body = body.encode(charset, 'replace')
-                
+
                 msg = MIMEText(body, 'plain', charset)
                 if subject: msg['Subject'] = subject
                 msg['From'] = mfrom
@@ -122,37 +123,38 @@ class Transport:
             self.jabber.send(Error(event,ERR_ITEM_NOT_FOUND))
 
     def mail_check(self):
-        
+
         if time.time() < self.lastcheck + 5:
             return
-            
+
         self.lastcheck = time.time()
-        
+
         mails = os.listdir(self.watchdir)
-        
+
         for mail in mails:
             fullname = '%s%s' % (self.watchdir, mail)
             fp = open(fullname)
             msg = email.message_from_file(fp)
             fp.close()
             os.remove(fullname)
-            
+
             if config.dumpProtocol: print 'RECEIVING:\n' + msg.as_string()
 
             mfrom = email.Utils.parseaddr(msg['From'])[1]
             mto = email.Utils.parseaddr(msg['To'])[1]
-            
+
             jfrom = '%s@%s' % (mfrom.replace('@', '%'), config.jid)
-            
+
             tosplit = mto.split('@', 1)
             jto = None
             for mapping in self.mappings:
                 if mapping[1] == tosplit[1]:
                     jto = '%s@%s' % (tosplit [0], mapping[0])
-            
+
             if not jto: continue
 
-            subject = msg['Subject']
+            (subject, charset) = decode_header(msg['Subject'])[0]
+            if charset: subject = unicode(subject, charset, 'replace')
 
             # we are assuming that text/plain will be first
             while msg.is_multipart():
@@ -211,7 +213,7 @@ if __name__ == '__main__':
         pidfile = open(config.pid,'w')
         pidfile.write(`os.getpid()`)
         pidfile.close()
-    
+
     if config.saslUsername:
         sasl = 1
     else:
