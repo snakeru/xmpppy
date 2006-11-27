@@ -18,6 +18,7 @@ class Transport:
         self.watchdir = config.watchDir.replace('~', os.environ['HOME'])
         # A list of two element lists, 1st is xmpp domain, 2nd is email domain
         self.mappings = [mapping.split('=') for mapping in config.domains]
+        email.Charset.add_charset( 'utf-8', email.Charset.SHORTEST, None, None )
 
     def register_handlers(self):
         self.jabber.RegisterHandler('message',self.xmpp_message)
@@ -97,7 +98,10 @@ class Transport:
                 subject = event.getSubject()
                 body = event.getBody()
                 
-                msg = MIMEText(body)
+                charset = 'utf-8'
+                body = body.encode(charset, 'replace')
+                
+                msg = MIMEText(body, 'plain', charset)
                 if subject: msg['Subject'] = subject
                 msg['From'] = mfrom
                 msg['To'] = mto
@@ -145,13 +149,19 @@ class Transport:
             for mapping in self.mappings:
                 if mapping[1] == tosplit[1]:
                     jto = '%s@%s' % (tosplit [0], mapping[0])
+            
+            if not jto: continue
 
             subject = msg['Subject']
-            body = None
-            if msg.is_multipart():
-                body = msg.get_payload(0)
-            else:
-                body = msg.get_payload()
+
+            # we are assuming that text/plain will be first
+            while msg.is_multipart():
+                msg = msg.get_payload(0)
+                if not msg: continue
+
+            charset = msg.get_charsets('us-ascii')[0]
+            body = msg.get_payload(None,True)
+            body = unicode(body, charset, 'replace')
 
             m = Message(to=jto,frm = jfrom, subject = subject, body = body)
             self.jabber.send(m)
