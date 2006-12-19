@@ -1025,23 +1025,23 @@ class Transport:
             self.jabberqueue(Presence(to =mjid, frm = '%s@%s/chat'%(YIDEncode(yid), config.jid),typ='unavailable'))
 
     def y_subscribe(self,yobj,yid,msg):
-        self.jabberqueue(Presence(typ='subscribe',frm = '%s@%s' % (YIDEncode(yid), config.jid), to=yobj.fromjid,payload=msg))
+        self.jabberqueue(Presence(typ='subscribe',frm = '%s@%s' % (YIDEncode(yid), config.jid), to=yobj.fromjid,payload=unicode(cpformat.do(msg),'utf-8','replace')))
 
     def y_message(self,yobj,yid,msg):
-        m = Message(typ='chat',frm = '%s@%s/messenger' %(YIDEncode(yid),config.jid), to=yobj.fromjid,body=cpformat.do(msg))
+        m = Message(typ='chat',frm = '%s@%s/messenger' %(YIDEncode(yid),config.jid), to=yobj.fromjid,body=unicode(cpformat.do(msg),'utf-8','replace'))
         m.setTag('x',namespace=NS_EVENT).setTag('composing')
         self.jabberqueue(m)
 
     def y_messagefail(self,yobj,yid,msg):
-        self.jabberqueue(Error(Message(typ='chat',to = '%s@%s' %(YIDEncode(yid),config.jid), frm=yobj.fromjid,body=msg),ERR_SERVICE_UNAVAILABLE))
+        self.jabberqueue(Error(Message(typ='chat',to = '%s@%s' %(YIDEncode(yid),config.jid), frm=yobj.fromjid,body=unicode(cpformat.do(msg))),ERR_SERVICE_UNAVAILABLE))
 
     def y_chatmessage(self,yobj,yid,msg):
-        m = Message(typ='chat',frm = '%s@%s/chat' %(YIDEncode(yid),config.jid), to=yobj.fromjid,body=cpformat.do(msg))
+        m = Message(typ='chat',frm = '%s@%s/chat' %(YIDEncode(yid),config.jid), to=yobj.fromjid,body=unicode(cpformat.do(msg),'utf-8','replace'))
         m.setTag('x',namespace=NS_EVENT).setTag('composing')
         self.jabberqueue(m)
 
     def y_roommessage(self,yobj,yid,room,msg):
-        txt = cpformat.do(msg)
+        txt = unicode(cpformat.do(msg),'utf-8','replace')
         to = JID(yobj.fromjid)
         to.setResource(yobj.chatresource)
         if yobj.roomlist[room]['byyid'].has_key(yid):
@@ -1058,7 +1058,7 @@ class Transport:
         self.jabberqueue(m)
 
     def y_calendar(self,yobj,url,desc):
-        m = Message(frm=config.jid,to=yobj.fromjid,typ='headline', subject = "Yahoo Calendar Event", body = desc)
+        m = Message(frm=config.jid,to=yobj.fromjid,typ='headline', subject = "Yahoo Calendar Event", body = unicode(desc,'utf-8','replace'))
         p = m.setTag('x', namespace = 'jabber:x:oob')
         p.addChild(name = 'url',payload=url)
         self.jabberqueue(m)
@@ -1139,7 +1139,7 @@ class Transport:
         if not self.userlist[fromjid].roomlist.has_key(info['room']):
             self.userlist[fromjid].roomlist[info['room']]={'byyid':{},'bynick':{},'info':info}
             self.jabberqueue(Presence(frm = '%s@%s' %(RoomEncode(info['room']),config.confjid),to=fromjid))
-            self.jabberqueue(Message(frm = '%s@%s' %(RoomEncode(info['room']),config.confjid),to=fromjid, typ='groupchat', subject= info['topic']))
+            self.jabberqueue(Message(frm = '%s@%s' %(RoomEncode(info['room']),config.confjid),to=fromjid, typ='groupchat', subject=unicode(cpformat.do(info['topic']),'utf-8','replace')))
 
     def y_chat_join(self,fromjid,room,info):
         if self.userlist[fromjid].roomlist.has_key(room):
