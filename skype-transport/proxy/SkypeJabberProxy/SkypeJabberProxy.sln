@@ -1,0 +1,20 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 9.00
+# Visual Studio 2005
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SkypeJabberProxy", "SkypeJabberProxy.csproj", "{18462AFD-6E27-4DE7-BD39-50F0A5CB3BEF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{18462AFD-6E27-4DE7-BD39-50F0A5CB3BEF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{18462AFD-6E27-4DE7-BD39-50F0A5CB3BEF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{18462AFD-6E27-4DE7-BD39-50F0A5CB3BEF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{18462AFD-6E27-4DE7-BD39-50F0A5CB3BEF}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
