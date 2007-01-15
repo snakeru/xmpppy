@@ -33,7 +33,7 @@ namespace SkypeControl
 
         private SkypeClient mySkypeClient = new SkypeClient();
 
-        public bool Conect()
+        public bool Connect()
         {
             return mySkypeClient.Connect();
         }
