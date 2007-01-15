@@ -105,7 +105,6 @@ namespace SkypeJabberProxy
                 string line = streamReader.ReadLine();
                 backgroundWorker.ReportProgress(0, line);
             }
-            backgroundWorker.ReportProgress(100, "SET SILENT_MODE OFF");
         }
 
         void backgroundWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
@@ -153,6 +152,7 @@ namespace SkypeJabberProxy
             streamReader = null;
             if (tcpClient != null) tcpClient.Close();
             tcpClient = null;
+            skypeProxy.Command("SET SILENT_MODE OFF");
             ConnectButton.Text = "&Connect";
             MessageLabel.Text = string.Empty;
             TransportHostTextBox.Enabled = true;
