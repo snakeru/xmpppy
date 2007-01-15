@@ -2,11 +2,14 @@
 <SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="SkypeJabberProxy.Properties" GeneratedClassName="Settings">
   <Profiles />
   <Settings>
-    <Setting Name="TransportHostname" Type="System.String" Scope="Application">
+    <Setting Name="TransportHostname" Type="System.String" Scope="User">
       <Value Profile="(Default)">localhost</Value>
     </Setting>
-    <Setting Name="TransportPort" Type="System.Int32" Scope="Application">
+    <Setting Name="TransportPort" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">10437</Value>
+    </Setting>
+    <Setting Name="JabberID" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
     </Setting>
   </Settings>
 </SettingsFile>

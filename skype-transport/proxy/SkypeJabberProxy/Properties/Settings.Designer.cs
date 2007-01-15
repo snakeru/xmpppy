@@ -23,21 +23,39 @@ namespace SkypeJabberProxy.Properties {
             }
         }
         
-        [global::System.Configuration.ApplicationScopedSettingAttribute()]
+        [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("localhost")]
         public string TransportHostname {
             get {
                 return ((string)(this["TransportHostname"]));
             }
+            set {
+                this["TransportHostname"] = value;
+            }
         }
         
-        [global::System.Configuration.ApplicationScopedSettingAttribute()]
+        [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("10437")]
         public int TransportPort {
             get {
                 return ((int)(this["TransportPort"]));
+            }
+            set {
+                this["TransportPort"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string JabberID {
+            get {
+                return ((string)(this["JabberID"]));
+            }
+            set {
+                this["JabberID"] = value;
             }
         }
     }
