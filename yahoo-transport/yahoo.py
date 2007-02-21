@@ -679,15 +679,19 @@ class Transport:
             username = []
             password = []
             fromjid = event.getFrom().getStripped().encode('utf8')
+            queryPayload = [Node('instructions', payload = 'Please provide your Yahoo! username and password')]
             if userfile.has_key(fromjid):
                 try:
                     username = userfile[fromjid]['username']
                     password = userfile[fromjid]['password']
                 except:
                     pass
+                queryPayload += [Node('username',payload=username),Node('password',payload=password),Node('registered')]
+            else:
+                queryPayload += [Node('username'),Node('password')]
             m = event.buildReply('result')
             m.setQueryNS(NS_REGISTER)
-            m.setQueryPayload([Node('instructions', payload = 'Please provide your Yahoo! username and password'),Node('username',payload=username),Node('password',payload=password),Node('registered')])
+            m.setQueryPayload(queryPayload)
             self.jabberqueue(m)
             #Add disco#info check to client requesting for rosterx support
             i= Iq(to=event.getFrom(), frm=config.jid, typ='get',queryNS=NS_DISCO_INFO)
