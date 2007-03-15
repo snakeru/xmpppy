@@ -6,14 +6,11 @@
     <!-- The JabberID of the transport -->
     <jid>yahoo.localhost</jid>
 
-    <!-- The component JID of the transport. Unless you're doing clustering, leave this alone -->
-    <!-- <compjid>yahoo1</compjid> -->
-
     <!-- The JabberID of the conference room handler. -->
     <confjid>chat.yahoo.localhost</confjid>
 
-    <!-- The component JID of the conference room handler. Unless you're doing clustering, leave this alone -->
-    <!-- <compjid>chat.yahoo1</compjid> -->
+    <!-- The component JID of the transport. Unless you're doing clustering, leave this alone -->
+    <!-- <compjid>yahoo1</compjid> -->
 
     <!-- The public IP or DNS name of the machine the transport is running on -->
     <!-- This is used to select the outgoing IP address used to connect to the Yahoo! network -->

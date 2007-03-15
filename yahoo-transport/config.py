@@ -5,9 +5,8 @@ configFiles = ['config.xml', '/etc/pyyimt.conf.xml']
 configFile = None
 
 jid = "yim"
-compjid = ""
 confjid = "chat.yim"
-confcompjid = ""
+compjid = ""
 host = ""
 discoName = "Yahoo! Transport"
 spoolFile = "user.dbm"

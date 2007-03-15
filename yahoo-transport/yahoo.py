@@ -1262,10 +1262,11 @@ if __name__ == '__main__':
         pidfile.write(`os.getpid()`)
         pidfile.close()
 
-    if not config.compjid:
+    if config.compjid:
+        xcp=1
+    else:
+        xcp=0
         config.compjid = config.jid
-    if not config.confcompjid:
-        config.confcompjid = config.confjid
 
     if config.saslUsername:
         sasl = 1
@@ -1282,7 +1283,7 @@ if __name__ == '__main__':
         debug=['always', 'nodebuilder']
     else:
         debug=[]
-    connection = xmpp.client.Component(config.compjid,config.port,debug=debug,domains=[config.compjid,config.confcompjid],sasl=sasl,bind=config.useComponentBinding,route=config.useRouteWrap)
+    connection = xmpp.client.Component(config.compjid,config.port,debug=debug,domains=[config.jid,config.confjid],sasl=sasl,bind=config.useComponentBinding,route=config.useRouteWrap,xcp=xcp)
     transport = Transport(connection)
     if not transport.xmpp_connect():
         print "Could not connect to server, or password mismatch!"
