@@ -5,6 +5,7 @@ configFiles = ['config.xml', '/etc/pymxitt.conf.xml']
 configFile = None
 
 jid = "mxit"
+confjid = "chat.mxit"
 host = ""
 discoName = "MXit Transport"
 spoolFile = "user.dbm"
