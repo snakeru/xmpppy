@@ -458,6 +458,7 @@ class Transport:
             password = []
             clientid = []
             fromjid = event.getFrom().getStripped().encode('utf8')
+            queryPayload = [Node('instructions', payload = 'Please provide your MXit username and password')]
             if userfile.has_key(fromjid):
                 try:
                     username = userfile[fromjid]['username']
@@ -465,17 +466,21 @@ class Transport:
                     clientid = userfile[fromjid]['clientid']
                 except:
                     pass
+                queryPayload += [
+                    Node('username',payload=username),
+                    Node('password',payload=password),
+                    Node('misc',payload=clientid),
+                    Node('registered')]
             else:
                 if not config.allowRegister:
                     return
+                queryPayload += [
+                    Node('username'),
+                    Node('password'),
+                    Node('misc')]
             m = event.buildReply('result')
             m.setQueryNS(NS_REGISTER)
-            m.setQueryPayload([
-                Node('instructions', payload = 'Please provide your MXit username and password'),
-                Node('username',payload=username),
-                Node('password',payload=password),
-                Node('misc',payload=clientid),
-                Node('registered')])
+            m.setQueryPayload(queryPayload)
             self.jabberqueue(m)
             #Add disco#info check to client requesting for rosterx support
             i= Iq(to=event.getFrom(), frm=config.jid, typ='get',queryNS=NS_DISCO_INFO)
