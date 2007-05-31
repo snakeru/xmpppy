@@ -1,17 +1,21 @@
-import httplib
+import httplib,sys,traceback
 
 def getavatar(aid, debug):
     #the aid value is the Avatar ID. This is given in tag 197
     conn = httplib.HTTPConnection("img1.avatar.vip.dcn.yahoo.com")
     if debug: conn.debuglevel=3
-    conn.request("GET","/users/%s.medium.png"%aid)
     try:
+        conn.request("GET","/users/%s.medium.png"%aid)
         r1 = conn.getresponse()
     except:
+        if debug: traceback.print_exc()
+        sys.exc_clear()
         return None
     #print r1.status, r1.reason
     if r1.status == 200:
-	try:
-           return r1.read()
-	except TypeError:
-	   return None
+        try:
+            return r1.read()
+        except TypeError:
+            if debug: traceback.print_exc()
+            sys.exc_clear()
+            return None
