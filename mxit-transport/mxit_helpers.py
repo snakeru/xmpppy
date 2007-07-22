@@ -23,7 +23,7 @@ def mxit_mkhdr(length, packettype, status, sessionid):
     return 'ln=%s%s' % (len(data) + length - 1, data)
 
 def mxit_dehdr(text):
-    # Unpack yahoo header into list
+    # Unpack mxit header into list
     zeroat = text.find('\x00')
     if zeroat < 0: return [[0,0,0,0],'']
     hdr = text[:zeroat].split('=')

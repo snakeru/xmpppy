@@ -454,18 +454,18 @@ class Transport:
 
     def xmpp_iq_register_get(self, con, event):
         if event.getTo() == config.jid:
-            username = []
-            password = []
-            clientid = []
+            username = ''
+            password = ''
+            clientid = ''
             fromjid = event.getFrom().getStripped().encode('utf8')
             queryPayload = [Node('instructions', payload = 'Please provide your MXit username and password')]
             if userfile.has_key(fromjid):
-                try:
+                if userfile[fromjid].has_key('username'):
                     username = userfile[fromjid]['username']
+                if userfile[fromjid].has_key('password'):
                     password = userfile[fromjid]['password']
+                if userfile[fromjid].has_key('clientid'):
                     clientid = userfile[fromjid]['clientid']
-                except:
-                    pass
                 queryPayload += [
                     Node('username',payload=username),
                     Node('password',payload=password),
@@ -496,15 +496,6 @@ class Transport:
             password = False
             clientid = False
             fromjid = event.getFrom().getStripped().encode('utf8')
-            #for each in event.getQueryPayload():
-            #    if each.getName() == 'username':
-            #        username = each.getData()
-            #        print "Have username ", username
-            #    elif each.getName() == 'password':
-            #        password = each.getData()
-            #        print "Have password ", password
-            #    elif each.getName() == 'remove':
-            #        remove = True
             query = event.getTag('query')
             if query.getTag('username'):
                 username = query.getTagData('username')
@@ -601,11 +592,12 @@ class Transport:
             v = m.addChild(name='vCard', namespace=NS_VCARD)
             nick = mxitid
             groups = []
-            for each in self.userlist[fromstripped].buddylist.keys():
-                for (buddymxitid,buddynick) in self.userlist[fromstripped].buddylist[each]:
-                    if mxitid == buddymxitid:
-                        nick = buddynick
-                        groups.append(each)
+            if self.userlist.has_key(fromstripped):
+                for each in self.userlist[fromstripped].buddylist.keys():
+                    for (buddymxitid,buddynick) in self.userlist[fromstripped].buddylist[each]:
+                        if mxitid == buddymxitid:
+                            nick = buddynick
+                            groups.append(each)
             v.setTagData(tag='NICKNAME', val=nick)
             v.setTagData(tag='ROLE', val=','.join(groups))            
             if userfile[fromstripped].has_key('avatar') and \
