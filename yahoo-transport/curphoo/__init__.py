@@ -5,5 +5,5 @@
 #   cpformat directly from curphoo
 #   YahooMD5 ported by hand from curphoo's c code
 #   yahoo_fn ported directly from curphoo's c code
-#   md5crypt from http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/325204
+#   md5crypt from http://www.sabren.net/code/python/crypt/md5crypt.py
 #   pysha from http://codespeak.net/svn/pypy/dist/pypy/lib/sha.py

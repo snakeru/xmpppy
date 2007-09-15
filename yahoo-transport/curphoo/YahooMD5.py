@@ -26,8 +26,9 @@
 
 # The curphoo_process_auth code comes from the GAIM project.
 
-import md5
-import pysha
+from __future__ import generators
+import md5,pysha,sha
+from array import array
 from string import maketrans
 from yahoo_fn import yahoo_xfrm
 from md5crypt import md5crypt
@@ -43,119 +44,114 @@ delimit_lookup      = ',;'
 
 def curphoo_process_auth(username, password, seed):
 
-    # 
-    # Magic: Phase 1.  Generate what seems to be a 30 
+    #
+    # Magic: Phase 1.  Generate what seems to be a 30
     # byte value (could change if base64
-    # ends up differently?  I don't remember and I'm 
+    # ends up differently?  I don't remember and I'm
     # tired, so use a 64 byte buffer.
     #
 
-    magic1 = ''
+    magic1 = []
     for char in seed:
+        # Ignore parentheses.
         if char == '(' or char == ')': continue
+        # Characters and digits verify against the challenge lookup.
         if char.isalpha() or char.isdigit():
             magic_work = challenge_lookup.index(char) << 3
         else:
             local_store = operand_lookup.index(char)
-            magic1 += chr(magic_work | local_store)
-            
-    # Magic: Phase 2.  Take generated magic value and 
+            magic1.append(magic_work | local_store)
+
+    # Magic: Phase 2.  Take generated magic value and
     # sprinkle fairy dust on the values.
 
-    magic2 = ''
+    magic2 = []
     for c in range(len(magic1)-1,0,-1):
-        byte1 = ord(magic1[c-1])
-        byte2 = ord(magic1[c])
-        
+        byte1 = magic1[c-1]
+        byte2 = magic1[c]
+
         byte1 *= 0xcd
         byte1 &= 0xff
         byte1 ^= byte2
-        
-        magic2 = chr(byte1) + magic2
 
-    magic2 = magic1[0] + magic2
+        magic2.append(byte1)
 
-    # Magic: Phase 3.  This computes 20 bytes.  The first 4 bytes are used as our magic 
-    # key (and may be changed later); the next 16 bytes are an MD5 sum of the magic key 
-    # plus 3 bytes.  The 3 bytes are found by looping, and they represent the offsets 
-    # into particular functions we'll later call to potentially alter the magic key. 
+    # Magic: Phase 3.  This computes 20 bytes.  The first 4 bytes are used as our magic
+    # key (and may be changed later); the next 16 bytes are an MD5 sum of the magic key
+    # plus 3 bytes.  The 3 bytes are found by looping, and they represent the offsets
+    # into particular functions we'll later call to potentially alter the magic key.
 
-    cnt = 1
-    comparison_src = ''
-    while cnt < len(magic2) and len(comparison_src) < 20:
-        bl = 0
-        cl = ord(magic2[cnt])
-        cnt = cnt + 1
+    comparison_src = array('B')
+    while len(magic2) > 0 and len(comparison_src) < 20:
+        cl = magic2.pop()
 
         if cl > 0x7f:
             if cl < 0xe0:
-                bl = cl = (cl & 0x1f) << 6
+                bl = (cl & 0x1f) << 6
             else:
-                bl = ord(magic2[cnt])
-                cnt = cnt + 1
+                bl = magic2.pop()
                 cl = (cl & 0x0f) << 6
                 bl = ((bl & 0x3f) + cl) << 6
-            cl = ord(magic2[cnt])
-            cnt = cnt + 1
-            bl = (cl & 0x3f) + bl
-        else:
-            bl = cl
+            cl = magic2.pop()
+            cl = (cl & 0x3f) + bl
 
-        comparison_src += chr((bl & 0xff00) >> 8) + chr(bl & 0xff)
+        comparison_src.append(cl >> 8)
+        comparison_src.append(cl & 0xff)
 
     # Compute values for recursive function table!
-    try:
-        for i in range(0xffff):
-            for j in range(5):
-                chal = comparison_src[:4] + chr(i & 0xff) + chr(i >> 8) + chr(j)
-                result = md5.new(chal).digest()
-                if result == comparison_src[4:]: 
-                    depth = i
-                    table = j
-                    raise 'done'
-    except 'done':
-        pass  
+    def find_table_depth_values(md5root, search_hash):
+        def guesser():
+            yield(3,88) # take a wild guess at what seems to be a constant
+            for i in range(0xffff):
+                for j in range(5):
+                    yield (j,i)
+        for (j,i) in guesser():
+            md5object = md5root.copy()
+            md5object.update(chr(i & 0xff) + chr(i >> 8) + chr(j))
+            if md5object.digest() == search_hash:
+                return (j,i)
+    (table,depth) = find_table_depth_values(md5.new(comparison_src[:4]), comparison_src[4:].tostring())
 
-    x = ord(comparison_src[3]) << 24l | ord(comparison_src[2]) << 16 | ord(comparison_src[1]) << 8 | ord(comparison_src[0])
+    # Transform magic_key_char using transform table
+    x = comparison_src[3] << 24l | comparison_src[2] << 16 | comparison_src[1] << 8 | comparison_src[0]
     x = yahoo_xfrm( table, depth, x )
     x = yahoo_xfrm( table, depth, x )
     magic_key_char = chr(x & 0xFF) + chr(x >> 8 & 0xFF) + chr(x >> 16 & 0xFF) + chr(x >> 24 & 0xFF)
 
-    crypt_result = md5crypt(password, '_2S43d5f')
+    crypt_result = md5crypt(password, '$1$_2S43d5f$')
 
-    return [
-        finalstep(password,     magic_key_char, table), 
-        finalstep(crypt_result, magic_key_char, table)]
+    def finalstep(input, magic_key_char, table):
 
-def finalxor(hash, mask):
-    result = ''
-    for c in hash:
-        result += chr(ord(c) ^ mask)
-    for c in range(64-len(hash)):
-        result += chr(mask)
-    return result
+        def finalxor(hash, mask):
+            result = array('B')
+            for c in hash:
+                result.append(ord(c) ^ mask)
+            for c in range(64-len(hash)):
+                result.append(mask)
+            return result.tostring()
 
-def finalstep(input, magic_key_char, table):
+        hash = md5.new(input).digest().encode('base64').translate(base64translate, '\r\n')
 
-    hash = md5.new(input).digest().encode('base64').translate(base64translate, '\r\n')
+        if (table >= 3): # We have to use the slow sha1 implementation to get to it's internals
+            sha1 = pysha.new(finalxor(hash, 0x36) + magic_key_char)
+            sha1.count[1] = sha1.count[1] - 1
+        else:
+            sha1 = sha.new(finalxor(hash, 0x36) + magic_key_char)
+        digest1 = sha1.digest()
+        digest2 = sha.new(finalxor(hash, 0x5c) + digest1).digest()
 
-    sha1 = pysha.new(finalxor(hash, 0x36) + magic_key_char)
-    if (table >= 3): sha1.count[1] = sha1.count[1] - 1
-    digest1 = sha1.digest()
+        result = ''
+        for i in range(10):
+            # First two bytes of digest stuffed together.
+            val = (ord(digest2[i * 2]) << 8) + ord(digest2[i*2+1])
 
-    digest2 = pysha.new(finalxor(hash, 0x5c) + digest1).digest()
+            result += alphabet1[(val >> 0x0b) & 0x1f] + '='
+            result += alphabet2[(val >> 0x06) & 0x1f]
+            result += alphabet2[(val >> 0x01) & 0x1f]
+            result += delimit_lookup[val & 0x01]
+        return result
 
-    result = ''
-    for i in range(10):
-        # First two bytes of digest stuffed together.
-        val = (ord(digest2[i * 2]) << 8) + ord(digest2[i*2+1])
-
-        result += alphabet1[(val >> 0x0b) & 0x1f] + '='
-        result += alphabet2[(val >> 0x06) & 0x1f]
-        result += alphabet2[(val >> 0x01) & 0x1f]
-        result += delimit_lookup[val & 0x01]
-
-    return result
+    return (finalstep(password, magic_key_char, table), finalstep(crypt_result, magic_key_char, table))
 
 if __name__ == '__main__':
 

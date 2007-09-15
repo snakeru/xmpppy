@@ -1,95 +1,159 @@
-# Based on FreeBSD src/lib/libcrypt/crypt.c 1.2
-# http://www.freebsd.org/cgi/cvsweb.cgi/~checkout~/src/lib/libcrypt/crypt.c?rev=1.2&content-type=text/plain
+#########################################################
+# md5crypt.py
+#
+# 0423.2000 by michal wallace http://www.sabren.com/
+# based on perl's Crypt::PasswdMD5 by Luis Munoz (lem@cantv.net)
+# based on /usr/src/libcrypt/crypt.c from FreeBSD 2.2.5-RELEASE
+#
+# MANY THANKS TO
+#
+#  Carey Evans - http://home.clear.net.nz/pages/c.evans/
+#  Dennis Marti - http://users.starpower.net/marti1/
+#
+#  For the patches that got this thing working!
+#
+#########################################################
+"""md5crypt.py - Provides interoperable MD5-based crypt() function
 
-# Original license:
-# * "THE BEER-WARE LICENSE" (Revision 42):
-# * <phk@login.dknet.dk> wrote this file.  As long as you retain this notice you
-# * can do whatever you want with this stuff. If we meet some day, and you think
-# * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
+SYNOPSIS
 
-# This port adds no further stipulations.  I forfeit any copyright interest.
+	import md5crypt.py
+
+	cryptedpassword = md5crypt.md5crypt(password, salt);
+
+DESCRIPTION
+
+unix_md5_crypt() provides a crypt()-compatible interface to the
+rather new MD5-based crypt() function found in modern operating systems.
+It's based on the implementation found on FreeBSD 2.2.[56]-RELEASE and
+contains the following license in it:
+
+ "THE BEER-WARE LICENSE" (Revision 42):
+ <phk@login.dknet.dk> wrote this file.  As long as you retain this notice you
+ can do whatever you want with this stuff. If we meet some day, and you think
+ this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
+
+apache_md5_crypt() provides a function compatible with Apache's
+.htpasswd files. This was contributed by Bryan Hart <bryan@eai.com>.
+
+"""
+
+MAGIC = '$1$'			# Magic string
+ITOA64 = "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
 import md5
 
-def md5crypt(password, salt, magic='$1$'):
+def to64 (v, n):
+    ret = ''
+    while (n - 1 >= 0):
+        n = n - 1
+	ret = ret + ITOA64[v & 0x3f]
+	v = v >> 6
+    return ret
+
+
+def apache_md5_crypt (pw, salt):
+    # change the Magic string to match the one used by Apache
+    return unix_md5_crypt(pw, salt, '$apr1$')
+
+
+def unix_md5_crypt(pw, salt, magic=None):
     
-    # /* The password first, since that is what is most unknown */ /* Then our magic string */ /* Then the raw salt */
-    m = md5.new()
-    m.update(password + magic + salt)
+    if magic==None:
+        magic = MAGIC
 
-    # /* Then just as many characters of the MD5(pw,salt,pw) */
-    mixin = md5.md5(password + salt + password).digest()
-    for i in range(0, len(password)):
-        m.update(mixin[i % 16])
+    # Take care of the magic string if present
+    if salt[:len(magic)] == magic:
+        salt = salt[len(magic):]
+        
 
-    # /* Then something really weird... */
-    # Also really broken, as far as I can tell.  -m
-    i = len(password)
+    # salt can have up to 8 characters:
+    import string
+    salt = string.split(salt, '$', 1)[0]
+    salt = salt[:8]
+
+    ctx = pw + magic + salt
+
+    final = md5.md5(pw + salt + pw).digest()
+
+    for pl in range(len(pw),0,-16):
+        if pl > 16:
+            ctx = ctx + final[:16]
+        else:
+            ctx = ctx + final[:pl]
+
+
+    # Now the 'weird' xform (??)
+
+    i = len(pw)
     while i:
         if i & 1:
-            m.update('\x00')
+            ctx = ctx + chr(0)  #if ($i & 1) { $ctx->add(pack("C", 0)); }
         else:
-            m.update(password[0])
-        i >>= 1
+            ctx = ctx + pw[0]
+        i = i >> 1
 
-    final = m.digest()
+    final = md5.md5(ctx).digest()
+    
+    # The following is supposed to make
+    # things run slower. 
 
-    # /* and now, just to make sure things don't run too fast */
+    # my question: WTF???
+
     for i in range(1000):
-        m2 = md5.md5()
+        ctx1 = ''
         if i & 1:
-            m2.update(password)
+            ctx1 = ctx1 + pw
         else:
-            m2.update(final)
+            ctx1 = ctx1 + final[:16]
 
         if i % 3:
-            m2.update(salt)
+            ctx1 = ctx1 + salt
 
         if i % 7:
-            m2.update(password)
+            ctx1 = ctx1 + pw
 
         if i & 1:
-            m2.update(final)
+            ctx1 = ctx1 + final[:16]
         else:
-            m2.update(password)
+            ctx1 = ctx1 + pw
+            
+            
+        final = md5.md5(ctx1).digest()
 
-        final = m2.digest()
 
-    # This is the bit that uses to64() in the original code.
+    # Final xform
+                                
+    passwd = ''
 
-    itoa64 = './0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+    passwd = passwd + to64((int(ord(final[0])) << 16)
+                           |(int(ord(final[6])) << 8)
+                           |(int(ord(final[12]))),4)
 
-    rearranged = ''
-    for a, b, c in ((0, 6, 12), (1, 7, 13), (2, 8, 14), (3, 9, 15), (4, 10, 5)):
-        v = ord(final[a]) << 16 | ord(final[b]) << 8 | ord(final[c])
-        for i in range(4):
-            rearranged += itoa64[v & 0x3f]; v >>= 6
+    passwd = passwd + to64((int(ord(final[1])) << 16)
+                           |(int(ord(final[7])) << 8)
+                           |(int(ord(final[13]))), 4)
 
-    v = ord(final[11])
-    for i in range(2):
-        rearranged += itoa64[v & 0x3f]; v >>= 6
+    passwd = passwd + to64((int(ord(final[2])) << 16)
+                           |(int(ord(final[8])) << 8)
+                           |(int(ord(final[14]))), 4)
 
-    return magic + salt + '$' + rearranged
+    passwd = passwd + to64((int(ord(final[3])) << 16)
+                           |(int(ord(final[9])) << 8)
+                           |(int(ord(final[15]))), 4)
 
-if __name__ == '__main__':
+    passwd = passwd + to64((int(ord(final[4])) << 16)
+                           |(int(ord(final[10])) << 8)
+                           |(int(ord(final[5]))), 4)
 
-    def test(clear_password, the_hash):
-        magic, salt = the_hash[1:].split('$')[:2]
-        magic = '$' + magic + '$'
-        return md5crypt(clear_password, salt, magic) == the_hash
+    passwd = passwd + to64((int(ord(final[11]))), 2)
 
-    test_cases = (
-        (' ', '$1$yiiZbNIH$YiCsHZjcTkYd31wkgW8JF.'),
-        ('pass', '$1$YeNsbWdH$wvOF8JdqsoiLix754LTW90'),
-        ('____fifteen____', '$1$s9lUWACI$Kk1jtIVVdmT01p0z3b/hw1'),
-        ('____sixteen_____', '$1$dL3xbVZI$kkgqhCanLdxODGq14g/tW1'),
-        ('____seventeen____', '$1$NaH5na7J$j7y8Iss0hcRbu3kzoJs5V.'),
-        ('__________thirty-three___________', '$1$HO7Q6vzJ$yGwp2wbL5D7eOVzOmxpsy.'),
-        ('apache', '$apr1$J.w5a/..$IW9y6DR0oO/ADuhlMF5/X1'),
-    )
 
-    for clearpw, hashpw in test_cases:
-        if test(clearpw, hashpw):
-            print '%s: pass' % clearpw
-        else:
-            print '%s: FAIL' % clearpw
+    return magic + salt + '$' + passwd
+
+
+## assign a wrapper function:
+md5crypt = unix_md5_crypt
+
+if __name__ == "__main__":
+    print unix_md5_crypt("cat", "hat")
