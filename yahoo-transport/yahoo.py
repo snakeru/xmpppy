@@ -4,7 +4,7 @@ version = 'CVS ' + '$Revision$'.split()[1]
 #
 # Yahoo! Transport
 # June 2004 Copyright (c) Mike Albon
-# 2006 Copyright (c) Norman Rasmussen
+# 2007 Copyright (c) Norman Rasmussen
 #
 # This program is free software licensed with the GNU Public License Version 2.
 # For a full copy of the license please go here http://www.gnu.org/licenses/licenses.html#GPL
@@ -127,7 +127,6 @@ class Transport:
         con.handlers['chatonline']= self.y_chatonline
         con.handlers['chatoffline']= self.y_chatoffline
         con.handlers['login'] = self.y_login
-        con.handlers['logout'] = self.y_loginfail
         con.handlers['loginfail'] = self.y_loginfail
         con.handlers['subscribe'] = self.y_subscribe
         con.handlers['message'] = self.y_message
@@ -757,8 +756,8 @@ class Transport:
                         rdsocketlist[s]=yobj
                         self.yahooqueue(fromjid,yobj.ymsg_send_challenge())
                     yobj.handlers['login']=self.y_reg_login
-                    yobj.handlers['loginfail']=self.y_reg_loginfail
-                    yobj.handlers['closed']=self.y_reg_loginfail
+                    yobj.handlers['loginfail']=self.y_loginfail
+                    yobj.handlers['closed']=self.y_loginfail
                     yobj.handlers['ping']=self.y_ping
                     yobj.event = event
                     yobj.showstatus = None
@@ -1093,30 +1092,6 @@ class Transport:
         #self.jabberqueue(m)
         self.jabberqueue(Presence(to=yobj.event.getFrom(),frm=yobj.event.getTo(),typ=yobj.event.getType()))
         self.jabberqueue(Presence(typ='subscribe',to=yobj.fromjid, frm=config.jid))
-
-    def y_reg_loginfail(self,yobj,reason = None):
-        if config.dumpProtocol: print "got reg login fail: ",reason
-        if yobj.moreservers() and reason != None:
-            if rdsocketlist.has_key(yobj.sock):
-                del rdsocketlist[yobj.sock]
-            if wrsocketlist.has_key(yobj.sock):
-                del wrsocketlist[yobj.sock]
-            yobj.sock.close()
-            s= yobj.connect()
-            if s != None:
-                rdsocketlist[s]=yobj
-                self.userlist[yobj.fromjid]=yobj
-                self.yahooqueue(yobj.fromjid,yobj.ymsg_send_challenge())
-                return # this method terminates here - all change please
-        # registration login failure handler
-        self.jabberqueue(Error(yobj.event,ERR_NOT_ACCEPTABLE)) # will not work, no event object
-        del self.userlist[yobj.fromjid]
-        if rdsocketlist.has_key(yobj.sock):
-            del rdsocketlist[yobj.sock]
-        if wrsocketlist.has_key(yobj.sock):
-            del wrsocketlist[yobj.sock]
-        yobj.sock.close()
-        del yobj
 
     def y_send_online(self,fromjid,resource=None):
         if config.dumpProtocol: print 'xmpp_online:',fromjid,self.userlist[fromjid].roster
