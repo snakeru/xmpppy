@@ -18,6 +18,9 @@ def printpacket(packet):
 # Yahoo Functions
 class YahooCon:
     rbuf = ''
+    pripingtime = 0
+    secpingtime = 0
+    confpingtime = 0
     pripingobj = None
     secpingobj = None
     confpingojb = None
@@ -350,17 +353,16 @@ class YahooCon:
                     self.handlers['notify'](self,pay[each][4],pay[each][13]=='1')
 
     def ymsg_ping(self, hdr, pay):
-        #print "got lib ping"
-        self.secpingtime = 13
-        self.pripingtime = 3
+        self.secpingfreq = 60
+        self.pripingfreq = 4
         if pay[0].has_key(143):
-            self.secpingtime = float(pay[0][143])
+            self.secpingfreq = float(pay[0][143])
         else:
-            self.secpingtime = None
+            self.secpingfreq = None
         if pay[0].has_key(144):
-            self.pripingtime = float(pay[0][144])
+            self.pripingfreq = float(pay[0][144])
         else:
-            self.pripingtime = None
+            self.pripingfreq = None
         if self.handlers.has_key('ping'):
             self.handlers['ping'](self)
 
@@ -603,7 +605,7 @@ class YahooCon:
     def ymsg_send_back(self,msg=None):
         argu = {10:'0'}
         if msg != None:
-            argu[19] = msg.encode('utf-8')
+            argu[19] = msg.encode('utf-8','replace')
             argu[10] = '99'
         argu[47] = '0'
         if self.dumpProtocol: print "send_back",argu
@@ -613,7 +615,7 @@ class YahooCon:
 
     def ymsg_send_away(self,show = None, msg=None):
         if msg != None:
-            a={10:'99',19:msg.encode('utf-8')}
+            a={10:'99',19:msg.encode('utf-8','replace')}
         else:
             a={10:'1'}
         if show == None:

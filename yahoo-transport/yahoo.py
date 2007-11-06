@@ -9,7 +9,7 @@ version = 'CVS ' + '$Revision$'.split()[1]
 # This program is free software licensed with the GNU Public License Version 2.
 # For a full copy of the license please go here http://www.gnu.org/licenses/licenses.html#GPL
 
-import base64, ConfigParser, os, platform, re, select, sha, shelve, signal, socket, sys, time, traceback
+import base64, ConfigParser, os, platform, random, re, select, sha, shelve, signal, socket, sys, time, traceback
 import xmpp.client
 from curphoo import cpformat
 from xmpp.protocol import *
@@ -22,8 +22,8 @@ from toolbox import *
 VERSTR = 'Yahoo! Transport'
 rdsocketlist = {}
 wrsocketlist = {}
-#each item is a tuple of 4 values, 0 == frequency in seconds, 1 == offset from 0, 2 == function, 3 == arguments
-timerlist = []
+# key is a tuple of 3 values, (frequency in seconds, function, arguments), value is time of next call
+timerlist = {}
 
 NODE_AVATAR='jabber:x:avatar x'
 NODE_VCARDUPDATE='vcard-temp:x:update x'
@@ -70,11 +70,10 @@ class Transport:
         wrsocketlist[self.jabber.Connection._sock].append(packet)
 
     def yahooqueue(self,fromjid,packet):
-        if packet != None:
-            s = self.userlist[fromjid].sock
-            if not wrsocketlist.has_key(s):
-                wrsocketlist[s]=[]
-            wrsocketlist[s].append(packet)
+        s = self.userlist[fromjid].sock
+        if not wrsocketlist.has_key(s):
+            wrsocketlist[s]=[]
+        wrsocketlist[s].append(packet)
 
     def findbadconn(self):
         #print rdsocketlist
@@ -380,10 +379,10 @@ class Transport:
                             #print yobj.xresources
                             if yobj.xresources == {}:
                                 if config.dumpProtocol: print 'No more resource logins'
-                                if yobj.pripingobj in timerlist:
-                                    timerlist.remove(yobj.pripingobj)
-                                if yobj.secpingobj in timerlist:
-                                    timerlist.remove(yobj.secpingobj)
+                                if timerlist.has_key(yobj.pripingobj):
+                                    del timerlist[yobj.pripingobj]
+                                if timerlist.has_key(yobj.secpingobj):
+                                    del timerlist[yobj.secpingobj]
                                 del self.userlist[yobj.fromjid]
                                 if rdsocketlist.has_key(yobj.sock):
                                     del rdsocketlist[yobj.sock]
@@ -411,10 +410,9 @@ class Transport:
                                 yobj.chatresource = event.getFrom().getResource()
                                 #Add secondary ping object code
                                 freq = 5 * 60 #Secondary ping frequency from Zinc
-                                offset = int(time.time())%freq
-                                yobj.confpingtime = time.time()
-                                yobj.confpingobj=(freq,offset,self.yahooqueue,[yobj.fromjid, yobj.ymsg_send_confping()])
-                                timerlist.append(yobj.confpingobj)
+                                nextrun = int(time.time()) + random.randrange(freq)
+                                yobj.confpingobj=(freq,self.y_sendping,(yobj, yobj.ymsg_send_confping))
+                                timerlist[yobj.confpingobj]=nextrun
                                 yobj.roomtojoin = yidenc
                             else:
                                 self.yahooqueue(fromstripped,yobj.ymsg_send_chatjoin(yidenc))
@@ -423,8 +421,8 @@ class Transport:
                             self.yahooqueue(fromstripped,yobj.ymsg_send_chatleave(yidenc))
                             self.yahooqueue(fromstripped,yobj.ymsg_send_chatlogout())
                             self.yahooqueue(fromstripped,yobj.ymsg_send_conflogoff())
-                            if 'confpingobj' in dir(yobj) and yobj.confpingobj in timerlist:
-                                timerlist.remove(yobj.confpingobj)
+                            if 'confpingobj' in dir(yobj) and timerlist.has_key(yobj.confpingobj):
+                                del timerlist[yobj.confpingobj]
                         else:
                             self.jabberqueue(Error(event,ERR_FEATURE_NOT_IMPLEMENTED))
                     else:
@@ -889,12 +887,12 @@ class Transport:
                     self.y_loginfail(yobj)
             self.y_send_offline(yobj.fromjid)
             self.jabberqueue(Error(Presence(frm = yobj.fromjid, to = config.jid),ERR_REMOTE_SERVER_TIMEOUT))
-            if yobj.pripingobj in timerlist:
-                timerlist.remove(yobj.pripingobj)
-            if yobj.secpingobj in timerlist:
-                timerlist.remove(yobj.secpingobj)
-            if 'confpingobj' in dir(yobj) and yobj.confpingobj in timerlist:
-                timerlist.remove(yobj.confpingobj)
+            if timerlist.has_key(yobj.pripingobj):
+                del timerlist[yobj.pripingobj]
+            if timerlist.has_key(yobj.secpingobj):
+                del timerlist[yobj.secpingobj]
+            if 'confpingobj' in dir(yobj) and timerlist.has_key(yobj.confpingobj):
+                del timerlist[yobj.confpingobj]
             if self.userlist.has_key(yobj.fromjid):
                 del self.userlist[yobj.fromjid]
             if rdsocketlist.has_key(yobj.sock):
@@ -905,19 +903,24 @@ class Transport:
                 yobj.sock.close()
             del yobj
 
+    def y_sendping(self, yobj, pingfunc):
+        data = pingfunc()
+        if data:
+            if config.dumpProtocol: print "sending ping"
+            self.yahooqueue(yobj.fromjid, data)
+        else:
+            if config.dumpProtocol: print "not sending ping"
+
     def y_ping(self, yobj):
         if config.dumpProtocol: print "got ping!"
-        #freq = yobj.pripingtime*60
-        freq = 5 * 60 #overide to ping time to try and reduce disconnects
-        offset = int(time.time())%freq
-        yobj.pripingtime = time.time()
-        yobj.pripingobj=(freq,offset,self.yahooqueue,[yobj.fromjid, yobj.ymsg_send_priping()])
-        timerlist.append(yobj.pripingobj)
-        freq = yobj.secpingtime*60
-        offset = int(time.time())%freq
-        yobj.secpingtime = time.time()
-        yobj.secpingobj=(freq,offset,self.yahooqueue,[yobj.fromjid, yobj.ymsg_send_secping()])
-        timerlist.append(yobj.secpingobj)
+        freq = yobj.pripingfreq*60
+        nextrun = int(time.time()) + random.randrange(freq)
+        yobj.pripingobj=(freq,self.y_sendping,(yobj, yobj.ymsg_send_priping))
+        timerlist[yobj.pripingobj] = nextrun
+        freq = yobj.secpingfreq*60
+        nextrun = int(time.time()) + random.randrange(freq)
+        yobj.secpingobj=(freq,self.y_sendping,(yobj, yobj.ymsg_send_secping))
+        timerlist[yobj.secpingobj] = nextrun
         for each in yobj.xresources.keys():
             mjid = JID(yobj.fromjid)
             mjid.setResource(each)
@@ -1008,7 +1011,7 @@ class Transport:
                 status = cpformat.do(yobj.roster[yid][2])
             else:
                 status = None
-            if config.dumpProtocol: print status
+            if config.dumpProtocol: print repr(status)
             b = Presence(to = mjid, frm = '%s@%s/messenger'%(YIDEncode(yid), config.jid),priority = 10, show=yobj.roster[yid][1], status=status)
             if hex != None:
                 b.addChild(node=Node(NODE_AVATAR,payload=[Node('hash',payload=hex)]))
@@ -1199,10 +1202,12 @@ class Transport:
     def xmpp_disconnect(self):
         for each in self.userlist.keys():
             yobj=self.userlist[each]
-            if yobj.pripingobj in timerlist:
-                timerlist.remove(yobj.pripingobj)
-            if yobj.secpingobj in timerlist:
-                timerlist.remove(yobj.secpingobj)
+            if timerlist.has_key(yobj.pripingobj):
+                del timerlist[yobj.pripingobj]
+            if timerlist.has_key(yobj.secpingobj):
+                del timerlist[yobj.secpingobj]
+            if 'confpingobj' in dir(yobj) and timerlist.has_key(yobj.confpingobj):
+                del timerlist[yobj.confpingobj]
             del self.userlist[yobj.fromjid]
             if rdsocketlist.has_key(yobj.sock):
                 del rdsocketlist[yobj.sock]
@@ -1324,12 +1329,12 @@ if __name__ == '__main__':
                         packet = wrsocketlist[each].pop(0)
                         if config.dumpProtocol: ylib.printpacket(packet)
                         each.send(packet)
-                    if wrsocketlist[each] == []:
-                        del wrsocketlist[each]
                 except socket.error:
                     transport.y_closed(rdsocketlist[each])
                 except:
                     logError()
+                if wrsocketlist[each] == []:
+                    del wrsocketlist[each]
             else:
                 #print 'not writing',each,rdsocketlist.has_key(each),wrsocketlist.has_key(each)
                 if rdsocketlist.has_key(each):
@@ -1337,11 +1342,13 @@ if __name__ == '__main__':
                 if wrsocketlist.has_key(each):
                     del wrsocketlist[each]
         #delayed execution method modified from python-irclib written by Joel Rosdahl <joel@rosdahl.net>
-        for each in timerlist:
-            #print int(time.time())%each[0]-each[1]
-            if not (int(time.time())%each[0]-each[1]):
+        #and fixed up by Norman
+        for each in timerlist.keys():
+            current_time = time.time()
+            if timerlist[each] < current_time:
                 try:
-                    apply(each[2],each[3])
+                    timerlist[each] = current_time + each[0]
+                    apply(each[1],each[2])
                 except:
                     logError()
     for each in [x for x in transport.userlist.keys()]:
