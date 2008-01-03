@@ -158,13 +158,10 @@ class Transport:
                     yid = YIDDecode(event.getTo().getNode())
                     yidenc = yid.encode('utf-8')
                     if event.getBody() == None:
-                        xevent = event.getTag('x',namespace=NS_EVENT)
-                        if xevent:
-                            state = '0'
-                            for events in xevent.getChildren():
-                                if events.getName() == 'composing':
-                                    state = '1'
-                            self.yahooqueue(fromstripped,yobj.ymsg_send_notify(yidenc,state))
+                        state = '0'
+                        if event.getTag('composing',namespace=NS_CHATSTATES):
+                            state = '1'
+                        self.yahooqueue(fromstripped,yobj.ymsg_send_notify(yidenc,state))
                         return
                     resource = 'messenger'
                     # normal non-groupchat or conference cases
@@ -492,7 +489,7 @@ class Transport:
         if to == config.jid:
             if node == None:
                 if type == 'info':
-                    features = [NS_VERSION,NS_COMMANDS,NS_AVATAR]
+                    features = [NS_VERSION,NS_COMMANDS,NS_AVATAR,NS_CHATSTATES]
                     if config.allowRegister or userfile.has_key(fromjid):
                         features = [NS_REGISTER] + features
                     return {
@@ -568,7 +565,7 @@ class Transport:
                 yid = YIDDecode(event.getTo().getNode())
                 if type == 'info':
                     if self.userlist[fromstripped].roster.has_key(yid):
-                        features = [NS_VCARD,NS_VERSION]
+                        features = [NS_VCARD,NS_VERSION,NS_CHATSTATES]
                         if userfile[fromstripped.encode('utf-8')].has_key('avatar'):
                             if userfile[fromstripped.encode('utf-8')]['avatar'].has_key(yid):
                                 features.append(NS_AVATAR)
@@ -1044,7 +1041,7 @@ class Transport:
 
     def y_message(self,yobj,yid,msg):
         m = Message(typ='chat',frm = '%s@%s/messenger' %(YIDEncode(yid),config.jid), to=yobj.fromjid,body=unicode(cpformat.do(msg),'utf-8','replace'))
-        m.setTag('x',namespace=NS_EVENT).setTag('composing')
+        m.setTag('active',namespace=NS_CHATSTATES)
         self.jabberqueue(m)
 
     def y_messagefail(self,yobj,yid,msg):
@@ -1052,7 +1049,7 @@ class Transport:
 
     def y_chatmessage(self,yobj,yid,msg):
         m = Message(typ='chat',frm = '%s@%s/chat' %(YIDEncode(yid),config.jid), to=yobj.fromjid,body=unicode(cpformat.do(msg),'utf-8','replace'))
-        m.setTag('x',namespace=NS_EVENT).setTag('composing')
+        m.setTag('active',namespace=NS_CHATSTATES)
         self.jabberqueue(m)
 
     def y_roommessage(self,yobj,yid,room,msg):
@@ -1067,9 +1064,10 @@ class Transport:
 
     def y_notify(self,yobj,yid,state):
         m = Message(typ='chat',frm = '%s@%s/messenger' %(YIDEncode(yid),config.jid), to=yobj.fromjid)
-        x = m.setTag('x',namespace=NS_EVENT)
         if state:
-            x.setTag('composing')
+            m.setTag('composing',namespace=NS_CHATSTATES)
+        else:
+            m.setTag('paused',namespace=NS_CHATSTATES)
         self.jabberqueue(m)
 
     def y_calendar(self,yobj,url,desc):
