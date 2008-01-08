@@ -1217,8 +1217,9 @@ class Transport:
         if wrsocketlist.has_key(self.jabber.Connection._sock):
             del wrsocketlist[self.jabber.Connection._sock]
         time.sleep(5)
-        while not self.jabber.reconnectAndReauth():
+        if not self.jabber.reconnectAndReauth():
             time.sleep(5)
+            self.xmpp_connect()
         rdsocketlist[self.jabber.Connection._sock]='xmpp'
 
 def loadConfig():
@@ -1242,7 +1243,8 @@ def logError():
     sys.exc_clear()
 
 def sigHandler(signum, frame):
-    #transport.offlinemsg = 'Signal handler called with signal %s'%signum
+    transport.offlinemsg = 'Signal handler called with signal %s'%signum
+    if config.dumpProtocol: print 'Signal handler called with signal %s'%signum
     transport.online = 0
 
 if __name__ == '__main__':
