@@ -16,7 +16,9 @@ class Transport:
 
     def __init__(self,jabber):
         self.jabber = jabber
-        self.watchdir = config.watchDir.replace('~', os.environ['HOME'])
+        self.watchdir = config.watchDir
+        if '~' in self.watchdir:
+            self.watchdir = self.watchdir.replace('~', os.environ['HOME'])
         # A list of two element lists, 1st is xmpp domain, 2nd is email domain
         self.mappings = [mapping.split('=') for mapping in config.domains]
         email.Charset.add_charset( 'utf-8', email.Charset.SHORTEST, None, None )
@@ -181,6 +183,12 @@ class Transport:
         if config.dumpProtocol: print "auth return:",connected
         return connected
 
+    def xmpp_disconnect(self):
+        time.sleep(5)
+        if not self.jabber.reconnectAndReauth():
+            time.sleep(5)
+            self.xmpp_connect()
+
 def loadConfig():
     configOptions = {}
     for configFile in config.configFiles:
@@ -202,7 +210,8 @@ def logError():
     sys.exc_clear()
 
 def sigHandler(signum, frame):
-    #transport.offlinemsg = 'Signal handler called with signal %s'%signum
+    transport.offlinemsg = 'Signal handler called with signal %s'%signum
+    if config.dumpProtocol: print 'Signal handler called with signal %s'%signum
     transport.online = 0
 
 if __name__ == '__main__':
