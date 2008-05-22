@@ -46,6 +46,7 @@ Y_chtmsg = 168      # Chat Message
 Y_avatar = 188      # Avatar Image update
 Y_statusupdate = 198 #update of status (like away/back etc)
 Y_advstatusupdate = 199 #update of advanced status (like avatar etc)
+Y_cloud = 241       # 0 = Yahoo!, 2 = LiveID (WLM)
 
 Yahoosep = '\xc0\x80'
 
