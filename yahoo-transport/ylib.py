@@ -134,18 +134,12 @@ class YahooCon:
     def ymsg_online(self,hdr,pay):
         if pay[0].has_key(7):
             for each in pay:
+                typ = None
                 status = None
                 if pay[each].has_key(10):
-                    if pay[each][10] == '99':
-                        if pay[each].has_key(19):
-                            status = unicode(pay[each][19],'utf-8','replace')
+                    (typ, status) = self.determine_typ_status(pay[each])
+                    
                 if pay[each].has_key(7):
-                    typ = None
-                    if pay[each].has_key(47):
-                        if pay[each][47] == '1':
-                            typ = 'dnd'
-                        elif pay[each][47] == '2':
-                            typ = 'away'
                     self.roster[pay[each][7]]=('available', typ, status)
                     if pay[each].has_key(198):
                         if pay[each][198] == '1' and pay[each].has_key(197):
@@ -259,59 +253,59 @@ class YahooCon:
             if self.handlers.has_key('email'):
                 self.handlers['email'](self,fromtxt,fromaddr,subj)
 
-    def ymsg_away(self,hdr,pay):
-        if pay[0].has_key(10):
-            if pay[0][10] == '1':
+    def determine_typ_status(self, msg):
+        status = None
+        typ = None
+        if msg.has_key(10):
+            if msg[10] == '1':
                 status = "Be Right Back"
-            elif pay[0][10] == '2':
+            elif msg[10] == '2':
                 status = "Busy"
-            elif pay[0][10] == '3':
+            elif msg[10] == '3':
                 status = "Not at Home"
-            elif pay[0][10] == '4':
+            elif msg[10] == '4':
                 status = "Not at my Desk"
-            elif pay[0][10] == '5':
+            elif msg[10] == '5':
                 status = "Not in the office"
-            elif pay[0][10] == '6':
+            elif msg[10] == '6':
                 status = "On the phone"
-            elif pay[0][10] == '7':
+            elif msg[10] == '7':
                 status = "On Vacation"
-            elif pay[0][10] == '8':
+            elif msg[10] == '8':
                 status = "Out to lunch"
-            elif pay[0][10] == '9':
+            elif msg[10] == '9':
                 status = "Stepped Out"
-            elif pay[0][10] == '99':
-                if pay[0].has_key(19):
-                    status = re.sub('\x05','',unicode(pay[0][19],'utf-8','replace'))
+            elif msg[10] == '99':
+                if msg.has_key(19):
+                    status = re.sub('\x05','',unicode(msg[19],'utf-8','replace'))
                 else:
                     status = None
-            else:
+                typ = None
+                if msg.has_key(47):
+                    if msg[47] == '1':
+                        typ = "dnd"
+                    elif msg[47] == '2':
+                        typ = "away"
+            elif msg[10] == '999':
+                typ = "away"
                 status = None
-            typ = None
-            if pay[0].has_key(47):
-                if pay[0][47] == '1':
-                    typ = "dnd"
-                elif pay[0][47] == '2':
-                    typ = "away"
+        return (typ, status)
+
+    def ymsg_away(self,hdr,pay):
+        if pay[0].has_key(10):
+            (typ, status) = self.determine_typ_status(pay[0])
             if pay[0].has_key(7):
                 self.roster[pay[0][7]]=("available",typ,status)
                 if self.handlers.has_key('online'):
                     self.handlers['online'](self,pay[0][7])
 
     def ymsg_back(self,hdr,pay):
-        if pay[0].has_key(19):
-            status = unicode(pay[0][19],'utf-8','replace')
-        else:
-            status = None
-        typ = None
-        if pay[0].has_key(47):
-            if pay[0][47] == '1':
-                typ = 'dnd'
-            elif pay[0][47] == '2':
-                typ = 'away'
-        if pay[0].has_key(7):
-            self.roster[pay[0][7]]=('available',typ,status)
-            if self.handlers.has_key('online'):
-                self.handlers['online'](self,pay[0][7])
+        if pay[0].has_key(10):
+            (typ, status) = self.determine_typ_status(pay[0])                
+            if pay[0].has_key(7):
+                self.roster[pay[0][7]]=('available',typ,status)
+                if self.handlers.has_key('online'):
+                    self.handlers['online'](self,pay[0][7])
 
 
     def ymsg_roster(self,hdr,pay):
