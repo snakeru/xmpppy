@@ -143,7 +143,7 @@ class YahooCon:
                     self.roster[pay[each][7]]=('available', typ, status)
                     if pay[each].has_key(198):
                         if pay[each][198] == '1' and pay[each].has_key(197):
-                            b = avatar.getavatar(pay[each][197], self.dumpProtocol)
+                            b = avatar.getavatar(pay[each][7], self.dumpProtocol)
                             if b != None and self.handlers.has_key('avatar'):
                                 self.handlers['avatar'](self,pay[each][7],b)
                         elif pay[each][198] == '0':
