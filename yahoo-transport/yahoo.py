@@ -1106,13 +1106,14 @@ class Transport:
                 self.jabberqueue(Presence(frm = '%s@%s/messenger' % (YIDEncode(yid),config.jid), to = fromjid))
 
     def y_send_offline(self,fromjid,resource=None,status=None):
-        if config.dumpProtocol: print 'xmpp_offline:',fromjid,self.userlist[fromjid].roster
+        if config.dumpProtocol: print 'xmpp_offline:',fromjid
         fromstripped = fromjid
         if resource != None:
             fromjid = JID(fromjid)
             fromjid.setResource(resource)
         self.jabberqueue(Presence(to=fromjid,frm = config.jid, typ='unavailable',status=status))
         if self.userlist.has_key(fromstripped):
+            if config.dumpProtocol: print 'roster:',self.userlist[fromstripped].roster
             for yid in self.userlist[fromstripped].roster:
                 if self.userlist[fromstripped].roster[yid][0] == 'available':
                     self.jabberqueue(Presence(frm = '%s@%s/messenger' % (YIDEncode(yid),config.jid), to = fromjid, typ='unavailable'))
