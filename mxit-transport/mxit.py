@@ -118,6 +118,7 @@ class Transport:
         con.handlers['online']= self.mxit_online
         con.handlers['offline']= self.mxit_offline
         con.handlers['login'] = self.mxit_login
+        con.handlers['loginreconnect'] = self.mxit_loginreconnect
         con.handlers['loginfail'] = self.mxit_loginfail
         con.handlers['subscribe'] = self.mxit_subscribe
         con.handlers['message'] = self.mxit_message
@@ -533,6 +534,7 @@ class Transport:
                         self.userlist[fromjid]=mxitobj
                         self.mxitqueue(fromjid,mxitobj.mxit_send_login())
                     mxitobj.handlers['login']=self.mxit_reg_login
+                    mxitobj.handlers['loginreconnect']=self.mxit_loginreconnect
                     mxitobj.handlers['loginfail']=self.mxit_reg_loginfail
                     mxitobj.handlers['closed']=self.mxit_reg_loginfail
                     mxitobj.event = event
@@ -656,6 +658,22 @@ class Transport:
             conf['username']=mxitobj.username
             userfile[mxitobj.fromjid]=conf
             self.jabberqueue(Message(to=mxitobj.fromjid,frm=config.jid,subject='MXit login name',body='Your MXit username was specified incorrectly in the configuration. This may be because of an upgrade from a previous version, the configuration has been updated'))
+
+    def mxit_loginreconnect(self,mxitobj):
+        if config.dumpProtocol: print "got login reconnect"
+        if rdsocketlist.has_key(mxitobj.sock):
+            del rdsocketlist[mxitobj.sock]
+        if wrsocketlist.has_key(mxitobj.sock):
+            del wrsocketlist[mxitobj.sock]
+        mxitobj.sock.close()
+        s = mxitobj.connect()
+        if s != None:
+            rdsocketlist[s]=mxitobj
+            fromjid = mxitobj.event.getFrom()
+            fromstripped = fromjid.getStripped().encode('utf8')
+            self.mxitqueue(fromstripped,mxitobj.mxit_send_login())
+        else:
+            self.jabberqueue(Error(mxitobj.event,ERR_REMOTE_SERVER_TIMEOUT))
 
     def mxit_loginfail(self,mxitobj, reason = None):
         if config.dumpProtocol: print "got login fail: ",reason

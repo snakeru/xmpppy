@@ -61,8 +61,8 @@ class MXitCon:
     # utility methods
     def connect(self):
         self.connok=False
+        if self.dumpProtocol: print "conncount", self.conncount, self.hostlist
         while self.conncount != len(self.hostlist):
-            if self.dumpProtocol: print "conncount", self.conncount
             self.sock = None
             self.sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
             self.sock.bind((self.fromhost,0))
@@ -101,12 +101,20 @@ class MXitCon:
     # decoding handlers
     def mxit_login(self,hdr,pay):
         # process login packet
+        if self.dumpProtocol: print 'login',pay[1]
         if pay[1] == '0':
             self.mxit_parsebuddies(pay[5:-1])
             # need to process offline messages too (comes through as the last item)
             #if self.dumpProtocol: print "got to login handler"
             if self.handlers.has_key('login'):
                 self.handlers['login'](self)
+        elif len(pay[1]) > 1 and pay[1][0] == '16':
+            host = pay[1][1]
+            self.port = int(host[host.rindex(':')+1:])
+            self.hostlist = [host[host.index('//')+2:host.rindex(':')]]
+            self.conncount = 0
+            if self.handlers.has_key('loginreconnect'):
+                self.handlers['loginreconnect'](self)
         else:
             if self.handlers.has_key('loginfail'):
                 self.handlers['loginfail'](self,pay[1][1])
@@ -261,7 +269,7 @@ class MXitCon:
                 break
 
 if __name__ == '__main__':
-    mxit = MXitCon('MXitID','password','jid','',True)
+    mxit = MXitCon('MXitID','password','2412345678-1234-1234-1234-123456788901','jid','',True)
     while not mxit.connect():
         print 'sleep'
         time.sleep(5)
