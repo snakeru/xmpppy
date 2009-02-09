@@ -46,6 +46,130 @@ def RoomDecode(mxitid):
         return m.group(1).upper()
     return roomdeccodere.sub(decode, JIDDecode(mxitid))
 
+nonbreakingre1 = re.compile(u'(.) (?=(?:  )*$)')    # any char followed by a space (and followed by an even number of spaces and then the end of the string)
+nonbreakingre2 = re.compile(u'(^| ) ')        # start of string, or any two spaces
+def colourparse(str,baseurl):
+    # Each tuple consists of String, foreground, background, bold, underline, italic.
+    #str = str.replace('/','//')
+    foreground=None
+    background=None
+    bold=None
+    underline=None
+    italic=None
+    s = ''
+    html=[]
+    hs = ''
+    ctrseq=None
+    cmd=None
+    for e in str:
+        if ctrseq == '#':
+            if not foreground: foreground = ''
+            if len(foreground) < 6:
+                foreground += e
+            else:
+                ctrseq=None
+                if foreground == '??????':
+                    foreground = None
+        elif ctrseq == ':':
+            if cmd != None:
+                if e != ':':
+                    cmd += e
+                else:
+                    ctrseq = None
+            elif e == ':':
+                cmd = ''
+                html.append((hs,foreground,background,bold,underline,italic,None))
+                hs = ''
+            else:
+                s = '%s%s'%(s,ctrseq)
+                hs = '%s%s'%(hs,ctrseq)
+                ctrseq = None
+        if ctrseq:
+            pass
+        elif e == '*': # Bold
+            html.append((hs,foreground,background,bold,underline,italic,None))
+            if bold == True:
+                bold = None
+            else:
+                bold = True
+            hs = ''
+        elif e == '/': # Italic
+            html.append((hs,foreground,background,bold,underline,italic,None))
+            if italic == True:
+                italic = None
+            else:
+                italic = True
+            hs = ''
+        elif e == '_': # Underline
+            html.append((hs,foreground,background,bold,underline,italic,None))
+            if underline == True:
+                underline = None
+            else:
+                underline = True
+            hs = ''
+        elif e == '#': # Colour Code
+            html.append((hs,foreground,background,bold,underline,italic,None))
+            foreground = None
+            if not ctrseq:
+                ctrseq = e
+            hs = ''
+        elif e == ':': # Menu Option
+            if cmd:
+                params = dict([x.split('=',1) for x in cmd.split('|')])
+                if 'selmsg' in params:
+                    e = params['selmsg']
+                    html.append((hs,foreground,background,bold,underline,italic,None))
+                    if 'replymsg' in params:
+                        html.append((e,None,None,None,None,None,params['replymsg']))
+                    s = '%s%s'%(s,e)
+                    hs = ''
+                cmd = None
+            else:
+                if not ctrseq:
+                    ctrseq = e
+        elif e == '\x0a': # New line
+            html.append((hs,foreground,background,bold,underline,italic,None))
+            html.append(('\x0a',None,None,None,None,None,None))
+            s = '%s%s'%(s,e)
+            hs = ''
+        else:
+            s = '%s%s'%(s,e)
+            hs = '%s%s'%(hs,e)
+    html.append((hs,foreground,background,bold,underline,italic,None))
+    chtml = []
+    s = unicode(s,'utf8','replace')
+    for each in html:
+        chtml.append((nonbreakingre2.sub(u'\\1\xa0', nonbreakingre1.sub(u'\\1\xa0', unicode(each[0],'utf-8','strict'))),each[1],each[2],each[3],each[4],each[5],each[6]))
+    if len(chtml) > 1:
+        html = Node('html')
+        html.setNamespace('http://jabber.org/protocol/xhtml-im')
+        xhtml = html.addChild('body',namespace='http://www.w3.org/1999/xhtml')
+        #if config.dumpProtocol: print chtml
+        for each in chtml:
+            style = ''
+            if each[1] != None:
+                style = '%scolor:#%s;'%(style,each[1])
+            if each[2] != None:
+                style = '%sbackground-color:%s;'%(style,each[2])
+            if each[3]:
+                style = '%sfont-weight:bold;'%style
+            if each[4]:
+                style = '%stext-decoration:underline;'%style
+            if each[5]:
+                style = '%sfont-style:italic;'%style
+            if each[0] != '':
+                if each[0] == '\x0a':
+                    xhtml.addChild('br')
+                if each[6]:
+                    xhtml.addChild(name = 'a', attrs = {'href':baseurl+each[6]},payload=each[0])
+                elif style == '':
+                    xhtml.addData(each[0])
+                else:
+                    xhtml.addChild(name = 'span', attrs = {'style':style},payload=each[0])
+    else:
+        html = ''
+    return s,html
+
 class Transport:
 
     # This class is the main collection of where all the handlers for both the MXit and Jabber
@@ -707,7 +831,9 @@ class Transport:
         self.jabberqueue(Presence(typ='subscribe',frm = '%s@%s' % (MXitIDEncode(mxitid), config.jid), to=mxitobj.fromjid,payload=msg))
 
     def mxit_message(self,mxitobj,mxitid,msg,timestamp):
-        m = Message(typ='chat',frm = '%s@%s/mxit' %(MXitIDEncode(mxitid),config.jid), to=mxitobj.fromjid,body=msg)
+        frm = '%s@%s/mxit' %(MXitIDEncode(mxitid),config.jid)
+        line,xhtml = colourparse(msg,'xmpp:%s?message;type=chat;body='%frm)
+        m = Message(typ='chat',frm = frm, to=mxitobj.fromjid,body=line,payload=[xhtml])
         self.jabberqueue(m)
 
     def mxit_messagefail(self,mxitobj,mxitid,msg):
