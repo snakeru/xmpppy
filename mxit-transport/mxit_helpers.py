@@ -7,8 +7,9 @@ import struct
 M_login = 1         # Login
 M_logout = 2        # Logout
 M_online = 3        # User online
-M_recvmsg = 9       # Instant Message
-M_sendmsg = 10      # Instant Message
+M_ping = 9          # Keep alive (c2s)
+M_recvmsg = 9       # Instant Message (s2c)
+M_sendmsg = 10      # Instant Message (c2s)
 M_register = 11     # Register
 M_status = 32       # User Status
 

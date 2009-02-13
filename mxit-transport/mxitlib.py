@@ -16,9 +16,7 @@ def printpacket(packet):
 # MXit Functions
 class MXitCon:
     rbuf = ''
-    pripingobj = None
-    secpingobj = None
-    confpingojb = None
+    pingobj = None
     session = ''
     host = 'stream.mxit.co.za'
     hostlist = socket.gethostbyname_ex(host)[2]
