@@ -329,16 +329,20 @@ class YahooCon:
                         msg = '/me '+pay[each][14]
                 else:
                     msg = pay[each][14]
+                if pay[each].has_key(15):
+                    ts = pay[each][15]
+                else:
+                    ts = None
                 if hdr[3] == Y_msg:
                     if hdr[4] == 2:
                         if self.handlers.has_key('messagefail'):
-                            self.handlers['messagefail'](self, pay[each][4], msg)
+                            self.handlers['messagefail'](self, pay[each][4], msg, ts)
                     else:
                         if self.handlers.has_key('message'):
-                            self.handlers['message'](self, pay[each][4], msg)
+                            self.handlers['message'](self, pay[each][4], msg, ts)
                 if hdr[3] == Y_confpm:
                     if self.handlers.has_key('chatmessage'):
-                        self.handlers['chatmessage'](self,pay[each][4], msg)
+                        self.handlers['chatmessage'](self,pay[each][4], msg, ts)
 
     def ymsg_notify(self, hdr, pay):
         for each in pay.keys():

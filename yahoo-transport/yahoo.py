@@ -1039,15 +1039,16 @@ class Transport:
     def y_subscribe(self,yobj,yid,msg):
         self.jabberqueue(Presence(typ='subscribe',frm = '%s@%s' % (YIDEncode(yid), config.jid), to=yobj.fromjid,payload=unicode(cpformat.do(msg),'utf-8','replace')))
 
-    def y_message(self,yobj,yid,msg):
-        m = Message(typ='chat',frm = '%s@%s/messenger' %(YIDEncode(yid),config.jid), to=yobj.fromjid,body=unicode(cpformat.do(msg),'utf-8','replace'))
+    def y_message(self,yobj,yid,msg,timestamp):
+        if timestamp: timestamp = time.strftime('%Y%m%dT%H:%M:%S', time.gmtime(float(timestamp)))
+        m = Message(typ='chat',frm = '%s@%s/messenger' %(YIDEncode(yid),config.jid), to=yobj.fromjid,body=unicode(cpformat.do(msg),'utf-8','replace'), timestamp=timestamp)
         m.setTag('active',namespace=NS_CHATSTATES)
         self.jabberqueue(m)
 
-    def y_messagefail(self,yobj,yid,msg):
+    def y_messagefail(self,yobj,yid,msg,ts):
         self.jabberqueue(Error(Message(typ='chat',to = '%s@%s' %(YIDEncode(yid),config.jid), frm=yobj.fromjid,body=unicode(cpformat.do(msg))),ERR_SERVICE_UNAVAILABLE))
 
-    def y_chatmessage(self,yobj,yid,msg):
+    def y_chatmessage(self,yobj,yid,msg,ts):
         m = Message(typ='chat',frm = '%s@%s/chat' %(YIDEncode(yid),config.jid), to=yobj.fromjid,body=unicode(cpformat.do(msg),'utf-8','replace'))
         m.setTag('active',namespace=NS_CHATSTATES)
         self.jabberqueue(m)
