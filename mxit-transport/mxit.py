@@ -265,11 +265,11 @@ class Transport:
                     if event.getType() == None or event.getType() =='normal':
                         # normal message case
                         #print 'got message'
-                        self.mxitqueue(fromstripped,self.userlist[fromstripped].mxit_send_message(mxitidenc,event.getBody().encode('utf-8')))
+                        self.mxitqueue(fromstripped,self.userlist[fromstripped].mxit_send_message(mxitidenc,event.getBody().encode('utf-8'),7))
                     elif event.getType() == 'chat':
                         # normal chat case
                         #print 'got message'
-                        self.mxitqueue(fromstripped,self.userlist[fromstripped].mxit_send_message(mxitidenc,event.getBody().encode('utf-8')))
+                        self.mxitqueue(fromstripped,self.userlist[fromstripped].mxit_send_message(mxitidenc,event.getBody().encode('utf-8'),1))
                     else:
                         #print 'type error'
                         self.jabberqueue(Error(event,ERR_BAD_REQUEST))

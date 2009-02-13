@@ -189,8 +189,8 @@ class MXitCon:
         #hdr = mxit_mkhdr(len(pay), M_rosteradd,1,self.session)
         #return hdr+pay
 
-    def mxit_send_message(self, nick, msg):
-        pay = mxit_mkargu({'ms':[nick,msg,1]})
+    def mxit_send_message(self, nick, msg, type=1):
+        pay = mxit_mkargu({'ms':[nick,msg,type]})
         hdr = mxit_mkhdr(len(pay), M_sendmsg,1,self.session)
         return hdr+pay
 
