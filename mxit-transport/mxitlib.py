@@ -120,28 +120,40 @@ class MXitCon:
                 self.handlers['loginfail'](self,pay[1][1])
 
     def mxit_online(self,hdr,pay):
-        for each in pay[2:-1]:
-            if self.dumpProtocol: print 'online',repr(each)
-            if type(each) == type([]):
-                if len(each) == 5:
-                    [group, jid, nick, status, xport] = each
-                    if status != '0':
-                        typ = None
-                        if status == '2':
-                            typ = 'away'
-                        elif status == '4':
-                            typ = 'dnd'
-                        elif status == '5':
-                            typ = 'xa'
-                        elif status == '7':
-                            typ = 'invisible'
-                        self.roster[jid]=('available', typ, nick)
-                        if self.handlers.has_key('online'):
-                            self.handlers['online'](self,jid)
-                    else:
-                        self.roster[jid]=('unavailable', None, None)
-                        if self.handlers.has_key('offline'):
-                            self.handlers['offline'](self,jid)
+        msgs = None
+        for each in pay[2:]:
+            if not msgs:
+                if not type(each) is type([]):
+                    msgs = [each.split('\x02')[1]]
+                    continue
+                if self.dumpProtocol: print 'online',repr(each)
+                if type(each) == type([]):
+                    if len(each) == 5:
+                        [group, jid, nick, status, xport] = each
+                        if status != '0':
+                            typ = None
+                            if status == '2':
+                                typ = 'away'
+                            elif status == '4':
+                                typ = 'dnd'
+                            elif status == '5':
+                                typ = 'xa'
+                            elif status == '7':
+                                typ = 'invisible'
+                            self.roster[jid]=('available', typ, nick)
+                            if self.handlers.has_key('online'):
+                                self.handlers['online'](self,jid)
+                        else:
+                            self.roster[jid]=('unavailable', None, None)
+                            if self.handlers.has_key('offline'):
+                                self.handlers['offline'](self,jid)
+            else:
+                if type(each) is type([]) or not '\x02' in each:
+                    msgs.append(each)
+                    continue
+                msgs.append(each.split('\x02')[0])
+                self.mxit_msg(hdr, msgs)
+                msgs = [each.split('\x02')[1]]
 
     def mxit_roster(self,hdr,pay):
         if pay[0].has_key(3):
@@ -157,8 +169,13 @@ class MXitCon:
         pass
 
     def mxit_msg(self, hdr, pay):
+        msgs = pay[3].split('\x02')
+        if len(msgs) == 1:
+            ts = pay[2][1]
+        else:
+            ts = None
         if self.handlers.has_key('message'):
-            self.handlers['message'](self, pay[2][0], pay[3].split('\x02')[0], pay[2][1])
+            self.handlers['message'](self, pay[2][0], msgs[0], ts)
 
     def mxit_send_login(self):
         pay = mxit_mkargu({'ms':[self.password,'E-5.0.3-J-j2me',1,'',self.clientkey,'255','27'],'cr':'v5_6'})

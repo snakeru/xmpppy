@@ -833,7 +833,8 @@ class Transport:
     def mxit_message(self,mxitobj,mxitid,msg,timestamp):
         frm = '%s@%s/mxit' %(MXitIDEncode(mxitid),config.jid)
         line,xhtml = colourparse(msg,'xmpp:%s?message;type=chat;body='%frm)
-        m = Message(typ='chat',frm = frm, to=mxitobj.fromjid,body=line,payload=[xhtml])
+        if timestamp: timestamp = time.strftime('%Y%m%dT%H:%M:%S', time.gmtime(float(timestamp)))
+        m = Message(typ='chat',frm = frm, to=mxitobj.fromjid,body=line,payload=[xhtml],timestamp=timestamp)
         self.jabberqueue(m)
 
     def mxit_messagefail(self,mxitobj,mxitid,msg):
