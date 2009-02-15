@@ -4,10 +4,7 @@ import struct
 
 def writefile(path, data):
     type = path[-1][0]
-    if type == 0x6d:
-        type = 'png'
-        data = data[11:]
-    elif type in (0x68, 0x6c):
+    if type in (0x68, 0x6c, 0x6d):
         type = 'png'
     elif type == 0x6e:
         type = 'mid'
@@ -31,12 +28,25 @@ def readdynamicint(buffer, offset):
     else:
         raise 'failed to read dynamicint:%i,%s' % (type,`buffer[offset:offset+20]`)
 
-class hexer(object):
-    def __init__(self,value):
-        self.value = value
+class formatter(object):
+    def __init__(self,value,format):
+        self.repr = format%value
 
     def __repr__(self):
-        return hex(self.value)
+        return self.repr
+
+def parsesplash(buffer):
+    entries = []
+    offset = 0
+    while offset < len(buffer):
+        h = struct.unpack_from('!B', buffer, offset)[0]
+        offset += 1
+        if h == 0:
+            break
+        l = struct.unpack_from('!I', buffer, offset)[0]
+        entries.append((formatter(h,'0x%02x'),formatter(l,'0x%08x')))
+        offset += 4
+    return entries, buffer[offset:]
 
 def parse(buffer,path=()):
     entries = []
@@ -44,16 +54,28 @@ def parse(buffer,path=()):
     index = 0
     while offset < len(buffer):
         h = struct.unpack_from('!B', buffer, offset)[0]
-        l = readdynamicint(buffer, offset + 1)
-        d = buffer[offset+l[0]+2:offset+l[0]+l[1]+2]
+        e, l = readdynamicint(buffer, offset + 1)
+        offset += 2 + e
+        d = buffer[offset:offset + l]
+        offset += l
         if h == 4:
-            d = writefile(path, d)
+            if path[-1][0] == 0x6d:
+                i, d = parsesplash(d)
+                d = i + [writefile(path, d),]
+            else:
+                d = writefile(path, d)
         elif (h >= 0x60 and h <= 0x6F) or (h >= 0xA0 and h <= 0xAF):
             d = parse(d,path+((h,index),))
-        entries.append((hexer(h),hexer(l[1]),d))
-        offset += l[0] + l[1] + 2
+        entries.append((formatter(h,'0x%02x'),formatter(l,'0x%04x' if l > 0xff else '0x%02x'),d))
         index += 1
-    if offset != len(buffer): raise 'data error: %i != %i' % (offset, len(buffer))
+        if len(path) != 0: continue
+        if len(buffer) - offset < 4: break
+        c = struct.unpack_from('!I', buffer, offset)[0]
+        entries.append(formatter(c,'0x%08x'))
+        offset += 4
+        break
+    if offset < len(buffer): raise 'data left over: %i bytes: %s' % (len(buffer) - offset, `buffer[offset:]`)
+    if offset > len(buffer): raise 'ran out of data: %i bytes needed' % (offset - len(buffer))
     return entries
 
 def loadskin(filename):
