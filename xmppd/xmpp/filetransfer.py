@@ -140,7 +140,7 @@ class IBB(PlugIn):
         """
         sid,seq,data=stanza.getTagAttr('data','sid'),stanza.getTagAttr('data','seq'),stanza.getTagData('data')
         self.DEBUG('ReceiveHandler called sid->%s seq->%s'%(sid,seq),'info')
-        try: seq=int(seq); data=base64.decodestring(data)
+        try: seq=int(seq); data=base64.decodestring(bytes(data,'utf-8'))
         except: seq=''; data=''
         err=None
         if not sid in self._streams.keys(): err=ERR_ITEM_NOT_FOUND

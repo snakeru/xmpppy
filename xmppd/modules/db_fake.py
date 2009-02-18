@@ -194,14 +194,10 @@ class DB(PlugIn):
             return False
 
     def save_groupie(self,domain,node,jid,groups):
-        temp = []
-        for x in groups:
-            if type(x)==type(''): x = x.encode('utf-8')
-            elif type(x)==type(''): x = unicode(x).encode('utf-8')
-            temp += [x]
-        group_list = x
-        self.DEBUG("Saving groupie jid to database %s-->(%s) [%s]:\n"%(jid,node+'@'+domain,unicode(groups).encode('utf-8')),'info')
-        for gn,gm in db[domain][node]['groups'].iteritems():
+        temp = [x for x in groups]
+        group_list = temp[0] # will crash if empty!
+        self.DEBUG("Saving groupie jid to database %s-->(%s) [%s]:\n"%(jid,node+'@'+domain,str(groups)),'info')
+        for gn,gm in db[domain][node]['groups'].items():
             if gn not in group_list and jid in db[domain][node]['groups'][gn]:
                 db[domain][node]['groups'][gn].remove(jid)
             elif gn in group_list and jid not in db[domain][node]['groups'][gn]:
@@ -210,7 +206,7 @@ class DB(PlugIn):
     def del_groupie(self,domain,node,jid):
         try:
             self.DEBUG("Deleting groupie from database %s--X(%s):\n"%(jid,node+'@'+domain),'info')
-            for gn,gm in db[domain][node]['groups'].iteritems():
+            for gn,gm in db[domain][node]['groups'].items():
                 if jid in db[domain][node]['groups'][gn]:
                     db[domain][node]['groups'][gn].remove(jid)
         except Exception as err:

@@ -208,7 +208,7 @@ class Router:
             else:
                 self.routes[type_guid][server_guid]['info'] = {'port':server_port,'host':server_host,'bind':s}
             if type(options) == type({}):
-                for x,y in options.iteritems():
+                for x,y in options.items():
                     self.routes[type_guid][server_guid]['info'][x] = y
 
             if mode == 3:
@@ -340,7 +340,7 @@ class Router:
 
     def get_good_server(self,type_guid):
         out = None
-        for server,info in self.routes[type_guid].iteritems():
+        for server,info in self.routes[type_guid].items():
             if server == 'bind': continue
             if 'conn_max' not in info['info']:
                 info['info']['conn_max'] = 1000 # Change all of this later

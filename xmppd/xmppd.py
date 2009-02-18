@@ -170,7 +170,7 @@ class fake_select:
             data = {}
             poll = {'in':[],'out':[],'err':[]}
             out = []
-            for x,y in self._registered.iteritems():
+            for x,y in self._registered.items():
                 if y['mask']&self.POLLIN == self.POLLIN: poll['in'] += [y['fd']]
                 if y['mask']&self.POLLOUT == self.POLLOUT: poll['out'] += [y['fd']]
                 if y['mask']&self.POLLERR == self.POLLERR: poll['err'] += [y['fd']]
@@ -200,7 +200,7 @@ class fake_select:
                     else:
                         data[x.fileno()] = {'fd':x,'mask':self.POLLERR}
 
-            for k,d in data.iteritems():
+            for k,d in data.items():
                 out += [(k,d['mask'])]
             return out
 
@@ -314,7 +314,7 @@ class Session:
         except: received = b''
 
         if len(received): # length of 0 means disconnect
-            self.DEBUG(repr(self._sock.fileno())+' '+repr(received),'got')
+            self.DEBUG(repr(self.fileno())+' '+repr(received),'got')
             self.last_seen = time.time()
         else:
             self.DEBUG(self._owner._l(SESSION_RECEIVE_ERROR),'error')
@@ -324,9 +324,8 @@ class Session:
 
     def send(self,chunk):
         try:
-            if isinstance(chunk,Node): chunk = unicode(chunk).encode('utf-8')
-            elif type(chunk)==type(''): chunk = chunk.encode('utf-8')
-            #self.enqueue(chunk)
+            if isinstance(chunk,Node): chunk = bytes(chunk)
+            elif type(chunk)==str: chunk = chunk.encode('utf-8')
         except:
             pass
         self.enqueue(chunk)
@@ -364,17 +363,17 @@ class Session:
             self.stanza_queue=[]
             #### UNLOCK_QUEUE
 
-        if self.sendbuffer and select.select([],[self._sock],[])[1]:
+        if self.sendbuffer and select.select([],[self.fileno()],[])[1]:
             try:
                 # LOCK_QUEUE
                 sent=self._send(self.sendbuffer)
             except Exception as err:
-                if globals()['cmd_options'].enable_debug == True: print('Attempting to kill %i!!!\n%s'%(self._sock.fileno(),err))
+                if globals()['cmd_options'].enable_debug == True: print('Attempting to kill %i!!!\n%s'%(self.fileno(),err))
                 # UNLOCK_QUEUE
                 self.set_socket_state(SOCKET_DEAD)
                 self.DEBUG(self._owner._l(SESSION_SEND_ERROR),'error')
                 return self.terminate_stream()
-            self.DEBUG(repr(self._sock.fileno())+' '+repr(self.sendbuffer[:sent]),'sent')
+            self.DEBUG(repr(self.fileno())+' '+repr(self.sendbuffer[:sent]),'sent')
             self._stream_pos_sent+=sent
             self.sendbuffer=self.sendbuffer[sent:]
             self._stream_pos_delivered=self._stream_pos_sent            # Should be acquired from socket somehow. Take SSL into account.
@@ -384,7 +383,7 @@ class Session:
             # UNLOCK_QUEUE
         """
         elif self.lib_event == None:
-            if globals()['cmd_options'].enable_debug == True: print('starting-up libevent write-event for %i'%self._sock.fileno())
+            if globals()['cmd_options'].enable_debug == True: print('starting-up libevent write-event for %i'%self.fileno())
             self.lib_event = event.write(self._sock,self.libevent_write)
             self.lib_event.add()
         else:
@@ -399,12 +398,12 @@ class Session:
                 # LOCK_QUEUE
                 sent=self._send(self.sendbuffer)
             except Exception as err:
-                if globals()['cmd_options'].enable_debug == True: print('Attempting to kill %i!!!\n%s'%(self._sock.fileno(),err))
+                if globals()['cmd_options'].enable_debug == True: print('Attempting to kill %i!!!\n%s'%(self.fileno(),err))
                 # UNLOCK_QUEUE
                 self.set_socket_state(SOCKET_DEAD)
                 self.DEBUG(self._owner._l(SESSION_SEND_ERROR),'error')
                 return self.terminate_stream()
-            self.DEBUG(repr(self._sock.fileno())+' '+self.sendbuffer[:sent],'sent')
+            self.DEBUG(repr(self.fileno())+' '+self.sendbuffer[:sent],'sent')
             self._stream_pos_sent+=sent
             self.sendbuffer=self.sendbuffer[sent:]
             self._stream_pos_delivered=self._stream_pos_sent            # Should be acquired from socket somehow. Take SSL into account.
@@ -719,7 +718,7 @@ class Server:
                 port_map[str(x[0])] = x[1]
                 globals()['PORT_%s'%x[2]] = x[1]
 
-            for port, new_port in port_map.iteritems():
+            for port, new_port in port_map.items():
                     sock=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                     sock.bind(('', new_port))
@@ -932,7 +931,7 @@ class Server:
 
     def Privacy(self,peer,stanza):
         self.DEBUG('server',self._l(SERVER_PVCY_ACTIVATED),'warn')
-        template_input = {'jid_from':unicode(peer.peer).encode('utf-8'),'jid_to':unicode(stanza['to']).encode('utf-8')}
+        template_input = {'jid_from':peer.peer,'jid_to':stanza['to']}
         split_jid=self.tool_split_jid(peer.peer)
         if split_jid == None: return
         self.DEBUG('server',self._l(SERVER_PVCY_ACCESS_CHECK)%template_input,'info')
@@ -971,7 +970,7 @@ class Server:
                 return
 
             if to_roster != None:
-                for x,y in to_roster.iteritems():
+                for x,y in to_roster.items():
                     if x == node+'@'+domain:
                         to_working_roster_item = y
                         break;
@@ -984,7 +983,7 @@ class Server:
                 to_working_roster_item = {}
                 to_working_roster_item['subscription'] = 'none'
 
-            for z,a in roster.iteritems():
+            for z,a in roster.items():
                 if z == bareto:
                     if a['subscription']=='both' and 'subscription' in to_working_roster_item and to_working_roster_item['subscription']=='both':
                         self.DEBUG('server',self._l(SERVER_PVCY_ACCESS_CLEAR_BIDIRECTIONAL)%template_input,'info')

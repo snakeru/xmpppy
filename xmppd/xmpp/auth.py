@@ -143,7 +143,7 @@ class SASL(PlugIn):
             node=Node('auth',attrs={'xmlns':NS_SASL,'mechanism':'DIGEST-MD5'})
         elif "PLAIN" in mecs:
             sasl_data='%s\x00%s\x00%s'%(self.username+'@'+self._owner.Server,self.username,self.password)
-            node=Node('auth',attrs={'xmlns':NS_SASL,'mechanism':'PLAIN'},payload=[base64.encodestring(sasl_data)])
+            node=Node('auth',attrs={'xmlns':NS_SASL,'mechanism':'PLAIN'},payload=[base64.encodestring(bytes(sasl_data,'utf-8'))])
         else:
             self.startsasl='failure'
             self.DEBUG('I can only use DIGEST-MD5 and PLAIN mecanisms.','error')
@@ -173,7 +173,7 @@ class SASL(PlugIn):
 ########################################3333
         incoming_data=challenge.getData()
         chal={}
-        data=base64.decodestring(incoming_data)
+        data=str(base64.decodestring(bytes(incoming_data,'utf-8')),'utf-8')
         self.DEBUG('Got challenge:'+data,'ok')
         for pair in data.split(','):
             key,value=pair.split('=')
@@ -201,7 +201,7 @@ class SASL(PlugIn):
                 if key in ['nc','qop','response','charset']: sasl_data+="%s=%s,"%(key,resp[key])
                 else: sasl_data+='%s="%s",'%(key,resp[key])
 ########################################3333
-            node=Node('response',attrs={'xmlns':NS_SASL},payload=[base64.encodestring(sasl_data[:-1]).replace('\n','')])
+            node=Node('response',attrs={'xmlns':NS_SASL},payload=[base64.encodestring(bytes(sasl_data[:-1],'utf-8')).replace(b'\n',b'')])
             self._owner.send(node.__str__())
         elif 'rspauth' in chal: self._owner.send(Node('response',attrs={'xmlns':NS_SASL}).__str__())
         else:

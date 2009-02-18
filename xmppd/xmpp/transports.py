@@ -172,7 +172,7 @@ class HTTPPROXYsocket(TCPsocket):
             'User-Agent: HTTPPROXYsocket/v0.1']
         if 'user' in self._proxy and 'password' in self._proxy:
             credentials = '%s:%s'%(self._proxy['user'],self._proxy['password'])
-            credentials = base64.encodestring(credentials).strip()
+            credentials = str(base64.encodestring(bytes(credentials,'utf-8')),'utf-8').strip()
             connector.append('Proxy-Authorization: Basic '+credentials)
         connector.append('\r\n')
         self.send('\r\n'.join(connector))

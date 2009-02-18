@@ -61,7 +61,7 @@ class Router(PlugIn):
 
             jid_info = self._owner.tool_split_jid(barejid)
             contacts = session.getRoster()
-            for k,v in contacts.iteritems():
+            for k,v in contacts.items():
                 if v['subscription'] in ['from','both']:
                     self.DEBUG('Un-Presence attempt for contact "%s":'%k,'warn')
                     p = Presence(to=k,frm=session.peer,typ='unavailable')
@@ -81,7 +81,7 @@ class Router(PlugIn):
 
             jid_info = self._owner.tool_split_jid(barejid)
             contacts = session.getRoster()
-            for k,v in contacts.iteritems():
+            for k,v in contacts.items():
                 self.DEBUG('Un-Presence attempt for contact [INVISIBLE!!!]"%s":'%k,'warn')
                 p = Presence(to=k,frm=session.peer,typ='unavailable')
                 status=stanza.getTag('status')
@@ -125,7 +125,7 @@ class Router(PlugIn):
             self.DEBUG('Presence: Could not set barejid, fromOutside=True','warn')
 
         contacts = session.getRoster()
-        for x,y in contacts.iteritems():
+        for x,y in contacts.items():
             x_split = self._owner.tool_split_jid(x)
             self.DEBUG('Presence attempt for contact "%s":'%x,'warn')
             try:
@@ -189,7 +189,7 @@ class Router(PlugIn):
 
     def balance_of_presence(self,session,stanza):
         "Figures-out what should be done to a particular contact"
-        self.DEBUG('###BoP: SYSTEM PASS-THROUGH INSTIGATED [%s]'%unicode(stanza).encode('utf-8'),'warn')
+        self.DEBUG('###BoP: SYSTEM PASS-THROUGH INSTIGATED [%s]'%str(stanza),'warn')
         #Predefined settings
 #        ["subscribe", "subscribed", "unsubscribe", "unsubscribed"]
 
@@ -337,7 +337,7 @@ class Router(PlugIn):
                 ask_good = False
                 subscription_good = False
                 from_active = False
-                for x,y in roster.iteritems():
+                for x,y in roster.items():
                     if x=='ask' and y=='subscribe': ask_good = True
                     if x=='subscription' and y in ['none','from']: subscription_good = True
                     if y == 'from': from_active = True
