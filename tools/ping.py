@@ -74,7 +74,7 @@ except KeyboardInterrupt:
 
 avg_time_data = []
 number_returned = 0
-for x,y in message_pool.iteritems():
+for x,y in message_pool.items():
     if message_pool[x]['returned'] == True:
         avg_time_data += [message_pool[x]['fin'] - message_pool[x]['start']]
         number_returned += 1

@@ -260,7 +260,7 @@ class Debug:
             elif lf == -1 and last_char == LINE_FEED:
                 output = output[:-1]
         try:
-            self._fh.write( output )
+            self._fh.write(output)
         except:
             # unicode strikes again ;)
             s=''

@@ -573,7 +573,7 @@ class DataField(Node):
         for opt in lst: self.addOption(opt)
     def addOption(self,opt):
         """ Add one more label-option pair to this field."""
-        if type(opt) in [str,unicode]: self.addChild('option').setTagData('value',opt)
+        if type(opt)==str: self.addChild('option').setTagData('value',opt)
         else: self.addChild('option',{'label':opt[0]}).setTagData('value',opt[1])
     def getType(self):
         """ Get type of this field. """

@@ -111,7 +111,7 @@ class MessageCatcher(PlugIn):
                 if roster == None:
                     out_body += 'No data found.'
                 else:
-                    for x,y in roster.iteritems():
+                    for x,y in roster.items():
                         out_body += '%s=%s\n'%(x,y)
 
 

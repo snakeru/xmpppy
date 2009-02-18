@@ -36,7 +36,7 @@ class ROSTER(PlugIn):
                         kid.delAttr('ask')
                         self._owner.DB.del_from_roster_jid(s_split_jid[1],s_split_jid[0],split_jid[0]+'@'+split_jid[1],'ask')
 
-                    self.DEBUG(unicode(info).encode('utf-8'),'error')
+                    self.DEBUG(info,'error')
                     self._owner.DB.save_to_roster(s_split_jid[1],s_split_jid[0],split_jid[0]+'@'+split_jid[1],info)
                     if kid.kids != []:
                         group_list = []
@@ -100,7 +100,7 @@ class ROSTER(PlugIn):
             name = self._owner.DB.get(split_jid[1],split_jid[0],'name')
             groups = session.getGroups()
             atag.setAttr('jid',bareto)
-            for x,y in session.getRoster()[bareto].iteritems():
+            for x,y in session.getRoster()[bareto].items():
                 atag.setAttr(x,y)
             if type(options) == dict and 'attr' in options:
                 for ok,od in options['attr']:
@@ -113,7 +113,7 @@ class ROSTER(PlugIn):
                 self._owner.DB.del_from_roster_jid(s_split_jid[1],s_split_jid[0],bareto,'ask')
 
             if groups != None:
-                for gn,gm in groups.iteritems():
+                for gn,gm in groups.items():
                     if bareto in gm:
                         atag.T.group.setData(gn)
                         break
@@ -127,7 +127,7 @@ class ROSTER(PlugIn):
 
     def RosterPush(self,session,stanza,mode='result'):
         rep=stanza.buildReply(mode)
-        for k,v in session.getRoster().iteritems():
+        for k,v in session.getRoster().items():
             atag = rep.T.query.NT.item
             split_jid = self._owner.tool_split_jid(k)
             if split_jid != None:
@@ -136,12 +136,12 @@ class ROSTER(PlugIn):
                 name = None
             groups = session.getGroups()
             atag.setAttr('jid',k)
-            for x,y in v.iteritems():
+            for x,y in v.items():
                 atag.setAttr(x,y)
             if atag.getAttr('name') == None and name != None: atag.setAttr('name',name)
 
             if groups != None:
-                for gn,gm in groups.iteritems():
+                for gn,gm in groups.items():
                     for igm in gm:
                         if igm == k:
                             atag.T.group.setData(gn)

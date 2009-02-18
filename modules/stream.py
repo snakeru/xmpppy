@@ -6,9 +6,8 @@
 
 from xmpp import *
 from xmppd import *
-import socket,_thread
+import socket,_thread,ssl,select
 import _thread as thread
-#from tlslite.api import *
 
 class TLS(PlugIn):
     """ 3.                        <features/>
@@ -57,20 +56,29 @@ class TLS(PlugIn):
             session.unfeature(NS_TLS)
             session.terminate_stream(STREAM_INTERNAL_SERVER_ERROR)
             return
-
-        x509 = X509()
-        x509.parse(cert)
-        certChain = X509CertChain([x509])
-        privateKey = parsePEMKey(key, private=True)
-        connection = TLSConnection(session._sock)
-        try: connection.handshakeServer(certChain=certChain, privateKey=privateKey, reqCert=False)
+        old_fileno=session._sock.fileno()
+        connection = ssl.wrap_socket(session._sock, server_side=True, certfile=self._owner.sslcertfile, keyfile=self._owner.sslkeyfile)
+        try:
+            while True:
+                try:
+                    connection.do_handshake()
+                    break
+                except ssl.SSLError as err:
+                    if err.args[0] == ssl.SSL_ERROR_WANT_READ:
+                        select.select([connection], [], [])
+                    elif err.args[0] == ssl.SSL_ERROR_WANT_WRITE:
+                        select.select([], [connection], [])
+                    else:
+                        raise
         except:
             session.terminate_stream(unregister=0)
             return
 
         session._sslObj = connection
-        session._recv = connection.read
-        session._send = connection.send
+        session._recv   = connection.read
+        session._send   = connection.write
+        session.fileno  = connection.fileno
+        self.DEBUG('fileno switched from %s to %s'%(old_fileno,connection.fileno()),'info')
 
         session.feature(NS_TLS)      # TLS enabled, do not declare it anymore
         session.stop_feature(NS_TLS) # TLS finished, let another features start
@@ -101,7 +109,7 @@ class TLS(PlugIn):
         if NS_TLS in session.features: return     # already started. do nothing
         if session.feature_in_process: return     # some other feature is already underway
         if not stanza.getTag('starttls',namespace=NS_TLS):
-            self.DEBUG("TLS unsupported by remote server; Doing nothing -- Prob. jabber.org?",'warn')
+            self.DEBUG("TLS unsupported by remote server; Doing nothing",'warn')
             return
         else:
             self.DEBUG("TLS supported by remote server. Requesting TLS start.",'ok')
@@ -162,7 +170,7 @@ class SASL(PlugIn):
             node=Node('auth',attrs={'xmlns':NS_SASL,'mechanism':'DIGEST-MD5'})
         elif "PLAIN" in mecs:
             sasl_data='%s\x00%s\x00%s'%(self.username+'@'+session.peer,self.username,self.password)
-            node=Node('auth',attrs={'xmlns':NS_SASL,'mechanism':'PLAIN'},payload=[base64.encodestring(sasl_data)])
+            node=Node('auth',attrs={'xmlns':NS_SASL,'mechanism':'PLAIN'},payload=[base64.encodestring(bytes(sasl_data,'utf-8'))])
         else:
             session.startsasl='failure'
             self.DEBUG('I can only use DIGEST-MD5 and PLAIN mecanisms.','error')
@@ -202,12 +210,13 @@ class SASL(PlugIn):
             else: session.sasl['next']=['challenge','success','failure']
         if stanza.getName() not in session.sasl['next']:
             # screwed SASL implementation on the other side. terminating stream
-            session.terminate_stream(STREAM_BAD_REQUEST)
+            session.terminate_stream(STREAM_BAD_FORMAT)
             raise NodeProcessed
         #=================== preparation ===============================================
-        try: data=base64.decodestring(stanza.getData())
+        try:
+            data=str(base64.decodestring(bytes(stanza.getData(),'utf-8')),'utf-8')
         except:
-            session.terminate_stream(STREAM_BAD_REQUEST)
+            session.terminate_stream(STREAM_BAD_FORMAT)
             raise NodeProcessed
         self.DEBUG('Got challenge: '+repr(data),'ok')
         for pair in data.split(','):
@@ -273,7 +282,7 @@ class SASL(PlugIn):
                 for key in ['charset','username','realm','nonce','nc','cnonce','digest-uri','response','qop']:
                     if key in ['nc','qop','response','charset']: sasl_data+="%s=%s,"%(key,resp[key])
                     else: sasl_data+='%s="%s",'%(key,resp[key])
-                node=Node('response',attrs={'xmlns':NS_SASL},payload=[base64.encodestring(sasl_data[:-1]).replace('\n','')])
+                node=Node('response',attrs={'xmlns':NS_SASL},payload=[base64.encodestring(bytes(sasl_data[:-1],'utf-8')).replace('\n','')])
                 self._owner.send(node)
             elif 'rspauth' in chal: self._owner.send(Node('response',attrs={'xmlns':NS_SASL}))
 """
