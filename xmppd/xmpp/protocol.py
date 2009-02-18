@@ -110,7 +110,7 @@ remote-server-timeout -- 504 -- wait -- A remote server or service specified as 
 resource-constraint -- 500 -- wait -- The server or recipient lacks the system resources necessary to service the request.
 service-unavailable -- 503 -- cancel -- The server or recipient does not currently provide the requested service.
 subscription-required -- 407 -- auth -- The requesting entity is not authorized to access the requested service because a subscription is required.
-undefined-condition -- 500 --  --
+undefined-condition -- 500 --  -- The server encountered some internal error.
 unexpected-request -- 400 -- wait -- The recipient or server understood the request but was not expecting it at this time (e.g., the request was out of order)."""
 sasl_error_conditions="""
 aborted --  --  -- The receiving entity acknowledges an <abort/> element sent by the initiating entity; sent in reply to the <abort/> element.
@@ -270,7 +270,7 @@ class Protocol(Node):
         if not node and xmlns: self.setNamespace(xmlns)
         if self['to']: self.setTo(self['to'])
         if self['from']: self.setFrom(self['from'])
-        if node and type(self)==type(node) and self.__class__==node.__class__ and self.attrs.has_key('id'): del self.attrs['id']
+        if node and type(self)==type(node) and self.__class__==node.__class__ and 'id' in self.attrs: del self.attrs['id']
         self.timestamp=None
         for x in self.getTags('x',namespace=NS_DELAY):
             try:
@@ -482,7 +482,7 @@ class ErrorNode(Node):
         """ Create new error node object.
             Mandatory parameter: name - name of error condition.
             Optional parameters: code, typ, text. Used for backwards compartibility with older jabber protocol."""
-        if ERRORS.has_key(name):
+        if name in ERRORS:
             cod,type,txt=ERRORS[name]
             ns=name.split()[0]
         else: cod,ns,type,txt='500',NS_STANZAS,'cancel',''

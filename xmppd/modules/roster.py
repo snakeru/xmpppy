@@ -25,7 +25,7 @@ class ROSTER(PlugIn):
 
                     subscription = kid.getAttr('subscription')
                     if subscription != None: info.update({'subscription':subscription})
-                    elif kid.getAttr('jid') not in the_roster.keys() or the_roster[kid.getAttr('jid')].has_key('subscription') == False:
+                    elif kid.getAttr('jid') not in the_roster.keys() or 'subscription' not in the_roster[kid.getAttr('jid')]:
                         self.DEBUG('###ROSTER+: Wow, subscription is not active -- better create one pronto!','warn')
                         kid.setAttr('subscription','none')
 
@@ -102,7 +102,7 @@ class ROSTER(PlugIn):
             atag.setAttr('jid',bareto)
             for x,y in session.getRoster()[bareto].iteritems():
                 atag.setAttr(x,y)
-            if options == {} and options.has_key('attr'):
+            if type(options) == dict and 'attr' in options:
                 for ok,od in options['attr']:
                     atag.setAttr(ok,od)
             if atag.getAttr('name') == None and name != None: atag.setAttr('name',name)

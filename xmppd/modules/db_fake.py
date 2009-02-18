@@ -123,7 +123,7 @@ class AUTH(PlugIn):
         except KeyError: pass
 
     def isuser(self, node, domain):
-        try: return db[domain].has_key(node)
+        try: return node in db[domain]
         except KeyError: pass
 
 class DB(PlugIn):
@@ -159,7 +159,7 @@ class DB(PlugIn):
 
     def save_to_roster(self,domain,node,jid,info,add_only_if_already=False):
         self.DEBUG("Saving roster info to database %s-->(%s) [%s]:\n"%(jid,node+'@'+domain,str(info)),'info')
-        if db[domain][node]['roster'].has_key(jid) and add_only_if_already==False:
+        if jid in db[domain][node]['roster'] and add_only_if_already==False:
             db[domain][node]['roster'][jid].update(info)
         else:
             db[domain][node]['roster'][jid] = info
@@ -168,7 +168,7 @@ class DB(PlugIn):
     def pull_roster(self,domain,node,jid):
         try:
             data = db[domain][node]['roster'][jid]
-            if data.has_key('subscription') == False:
+            if 'subscription' not in data:
                 data.update({'subscription':'none'})
             return data
         except KeyError:

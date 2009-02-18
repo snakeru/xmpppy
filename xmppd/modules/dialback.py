@@ -43,7 +43,7 @@ class Dialback(PlugIn):
             if not s:
                 s=self._owner.S2S(session.ourname,frm.getDomain(),slave_session=session)
             s.send(req)
-            if self.waitlist.has_key(frm):
+            if frm in self.waitlist:
                 self.waitlist[frm][1].terminate_stream(STREAM_CONFLICT)
             self.waitlist[frm]=(key,session)
         elif name=='verify' and session.TYP=='server':
@@ -58,7 +58,7 @@ class Dialback(PlugIn):
         elif name=='verify' and session.TYP=='client':
             # (9) Received the verification reply
             self.DEBUG('Received verified dialback key for id %s (%s->%s). Result is: %s.'%(stanza['id'],frm,to,stanza['type']),'info')
-            if self.waitlist.has_key(frm):
+            if frm in self.waitlist:
                 key,s=self.waitlist[frm]
                 if s.ID==stanza['id']:
                     rep=Node('db:result',{'from':to,'to':frm,'type':stanza['type']})

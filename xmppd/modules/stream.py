@@ -29,9 +29,9 @@ class TLS(PlugIn):
             self.DEBUG('TLS startup failure: already started.','error')
             session.unfeature(NS_TLS)
             raise NodeProcessed
-        if self._owner.__dict__.has_key('sslcertfile'): certfile=self._owner.sslcertfile
+        if 'sslcertfile' in self._owner.__dict__: certfile=self._owner.sslcertfile
         else: certfile=None
-        if self._owner.__dict__.has_key('sslkeyfile'): keyfile=self._owner.sslkeyfile
+        if 'sslkeyfile' in self._owner.__dict__: keyfile=self._owner.sslkeyfile
         else: keyfile=certfile
         try: open(certfile) ; open(keyfile)
         except: certfile=None
@@ -150,7 +150,7 @@ class SASL(PlugIn):
 
     def FeaturesHandler(self,session,feats):
         if session.feature_in_process: return     # some other feature is already underway
-        if not session.__dict__.has_key('username'): return
+        if 'username' not in session.__dict__: return
         if not feats.getTag('mechanisms',namespace=NS_SASL):
             session.unfeature(NS_SASL)
             self.DEBUG('SASL not supported by server','error')
@@ -194,9 +194,9 @@ class SASL(PlugIn):
         if NS_SASL in session.features:
             self.DEBUG('Already authorized. Ignoring SASL stanza.','error')
             raise NodeProcessed
-        if not session.__dict__.has_key('sasl'):
+        if 'sasl' not in session.__dict__:
             session.sasl={'retries':3}
-        if not session.sasl.has_key('next'):
+        if 'next' not in session.sasl:
             session.sasl={'retries':session.sasl['retries']}
             if session.TYP=='server': session.sasl['next']=['auth']
             else: session.sasl['next']=['challenge','success','failure']
@@ -232,7 +232,7 @@ class SASL(PlugIn):
                    authentication identity (identity whose password will be used),
                    followed by a NUL (U+0000) character, followed by the clear-text
                    password."""
-                if session.sasl.has_key('otherdata'): pack=session.sasl['otherdata'].split('\000')
+                if 'otherdata' in session.sasl: pack=session.sasl['otherdata'].split('\000')
                 else: pack=[]
                 authzid=session.peer
                 if len(pack)!=3: res=0
@@ -252,7 +252,7 @@ class SASL(PlugIn):
             """elif stanza.getName()=='challenge':
             session.sasl['next']=['challenge','success','failure']
             # DIGEST-MD5 only
-            if chal.has_key('qop') and chal['qop']=='auth':
+            if 'qop' in chal and chal['qop']=='auth':
                 resp={}
                 resp['username']=self.username
                 resp['realm']=self._owner.Server
@@ -275,7 +275,7 @@ class SASL(PlugIn):
                     else: sasl_data+='%s="%s",'%(key,resp[key])
                 node=Node('response',attrs={'xmlns':NS_SASL},payload=[base64.encodestring(sasl_data[:-1]).replace('\n','')])
                 self._owner.send(node)
-            elif chal.has_key('rspauth'): self._owner.send(Node('response',attrs={'xmlns':NS_SASL}))
+            elif 'rspauth' in chal: self._owner.send(Node('response',attrs={'xmlns':NS_SASL}))
 """
         elif stanza.getName()=='response':
             session.sasl['next']=['response','abort']
@@ -300,7 +300,7 @@ class Bind(PlugIn):
         server.Dispatcher.RegisterHandler('iq',self.bindHandler,typ='set',ns=NS_BIND,xmlns=NS_CLIENT)
 
     def bindHandler(self,session,stanza):
-        if session.xmlns!=NS_CLIENT or session.__dict__.has_key('resource'):
+        if session.xmlns!=NS_CLIENT or 'resource' in session.__dict__:
             session.send(Error(stanza,ERR_SERVICE_UNAVAILABLE))
         else:
             if session._session_state<SESSION_AUTHED:
