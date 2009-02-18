@@ -41,11 +41,8 @@ in this code
 
 import sys
 import time
-from string import join
 
 import types
-
-
 
 color_none         = chr(27) + "[0m"
 color_black        = chr(27) + "[30m"
@@ -170,16 +167,16 @@ class Debug:
                 try:
                     self._fh = open(log_file,'w')
                 except:
-                    print 'ERROR: can open %s for writing'
+                    print('ERROR: can open %s for writing')
                     sys.exit(0)
             else: ## assume its a stream type object
                 self._fh = log_file
         else:
             self._fh = sys.stdout
-         
+
         if time_stamp not in (0,1,2):
             msg2 = '%s' % time_stamp
-            raise 'Invalid time_stamp param', msg2
+            raise RuntimeError('Invalid time_stamp param %s'%msg2)
         self.prefix = prefix
         self.sufix = sufix
         self.time_stamp = time_stamp
@@ -196,17 +193,13 @@ class Debug:
                 mod_name = ""
             self.show('Debug created for %s%s' % (caller.f_code.co_filename,
                                                    mod_name ))
-            self.show(' flags defined: %s' % join( self.active ))
-            
+            self.show(' flags defined: %s' % self.active)
+
         if type(flag_show) in (type(''), type(None)):
             self.flag_show = flag_show
         else:
             msg2 = '%s' % type(flag_show )
-            raise 'Invalid type for flag_show!', msg2
-
-
-        
-
+            raise RuntimeError('Invalid type for flag_show! %s'%msg2)
 
     def show( self, msg, flag = None, prefix = None, sufix = None,
               lf = 0 ):
@@ -270,7 +263,7 @@ class Debug:
             self._fh.write( output )
         except:
             # unicode strikes again ;)
-            s=u''
+            s=''
             for i in range(len(output)):
                 if ord(output[i]) < 128:
                     c = output[i]
@@ -309,7 +302,7 @@ class Debug:
             flags = self._as_one_list( active_flags )
             for t in flags:
                 if t not in self.debug_flags:
-                    print 'Invalid debugflag given', t
+                    print('Invalid debugflag given', t)
                 ok_flags.append( t )
                 
             self.active = ok_flags
@@ -362,7 +355,7 @@ class Debug:
         """filter out any dupes."""
         if type(item) != type(''):
             msg2 = '%s' % item
-            raise 'Invalid item type (should be string)',msg2
+            raise RuntimeError('Invalid item type (should be string) %s'%msg2)
         if item not in lst:
             lst.append( item )
         return lst
@@ -374,7 +367,7 @@ class Debug:
             for f in self._as_one_list( flags ):
                 if not f in self.debug_flags:
                     msg2 = '%s' % f
-                    raise 'Invalid debugflag given', msg2
+                    raise RuntimeError('Invalid debugflag given %s'% msg2)
 
     def _remove_dupe_flags( self ):
         """

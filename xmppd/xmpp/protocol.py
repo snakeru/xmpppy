@@ -311,7 +311,7 @@ class Protocol(Node):
         errtag=self.getTag('error')
         if errtag:
             for tag in errtag.getChildren():
-                if tag.getName()<>'text': return tag.getName()
+                if tag.getName()!='text': return tag.getName()
             return errtag.getData()
     def getErrorCode(self):
         """ Return the error code. Obsolette. """
@@ -321,7 +321,7 @@ class Protocol(Node):
         if code:
             if str(code) in _errorcodes.keys(): error=ErrorNode(_errorcodes[str(code)],text=error)
             else: error=ErrorNode(ERR_UNDEFINED_CONDITION,code=code,typ='cancel',text=error)
-        elif type(error) in [type(''),type(u'')]: error=ErrorNode(error)
+        elif type(error) in [type(''),type('')]: error=ErrorNode(error)
         self.setType('error')
         self.addChild(node=error)
     def setTimestamp(self,val=None):
@@ -621,7 +621,7 @@ class DataForm(Node):
             for name in data.keys(): newdata.append(DataField(name,data[name]))
             data=newdata
         for child in data:
-            if type(child) in [type(''),type(u'')]: self.addInstructions(child)
+            if type(child) in [type(''),type('')]: self.addInstructions(child)
             elif child.__class__.__name__=='DataField': self.kids.append(child)
             else: self.kids.append(DataField(node=child))
     def getType(self):
@@ -659,7 +659,7 @@ class DataForm(Node):
         for field in self.getTags('field'):
             name=field.getAttr('var')
             typ=field.getType()
-            if type(typ) in [type(''),type(u'')] and typ[-6:]=='multi':
+            if type(typ) in [type(''),type('')] and typ[-6:]=='multi':
                 val=[]
                 for i in field.getTags('value'): val.append(i.getData())
             else: val=field.getTagData('value')

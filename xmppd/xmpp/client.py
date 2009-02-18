@@ -1,3 +1,4 @@
+#!/usr/bin/python2.6 -3
 ##   client.py
 ##
 ##   Copyright (C) 2003-2005 Alexey "Snake" Nezhdanov
@@ -133,7 +134,7 @@ class CommonClient:
 
     def event(self,eventName,args={}):
         """ Default event handler. To be overriden. """
-        print "Event: ",(eventName,args)
+        print("Event: ",(eventName,args))
 
     def isConnected(self):
         """ Returns connection state. F.e.: None / 'tls' / 'tcp+non_sasl' . """
