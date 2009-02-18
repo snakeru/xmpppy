@@ -19,9 +19,10 @@ Provides library with all Non-SASL and SASL authentication mechanisms.
 Can be used both for client and transport authentication.
 """
 
-from protocol import *
-from client import PlugIn
-import hashlib,base64,random,dispatcher
+from .protocol import *
+from .plugin import PlugIn
+import hashlib,base64,random
+from . import dispatcher
 
 def HH(some):
     if type(some)==string: some=bytes(some,'utf-8')

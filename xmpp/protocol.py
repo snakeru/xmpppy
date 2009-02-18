@@ -19,7 +19,7 @@ Protocol module contains tools that is needed for processing of
 xmpp-related data structures.
 """
 
-from simplexml import Node,ustr
+from .simplexml import Node,ustr
 import time
 
 NS_AGENTS       ='jabber:iq:agents'

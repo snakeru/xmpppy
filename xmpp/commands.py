@@ -31,8 +31,8 @@ What it supplies:
     A means of handling requests, by redirection though the command manager.
 """
 
-from protocol import *
-from client import PlugIn
+from .protocol import *
+from .plugin import PlugIn
 
 class Commands(PlugIn):
     """Commands is an ancestor of Plugin and can be attached to any session.
@@ -190,7 +190,7 @@ class Command_Handler_Prototype(PlugIn):
         self.sessions = {}
         # Disco information for command list pre-formatted as a tuple
         self.discoinfo = {'ids':[{'category':'automation','type':'command','name':self.description}],'features': self.discofeatures}
-        
+
     def plugin(self,owner,jid=''):
         """Plug command into the commands class"""
         # The owner in this instance is the Command Processor
