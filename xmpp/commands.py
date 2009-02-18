@@ -31,8 +31,8 @@ What it supplies:
     A means of handling requests, by redirection though the command manager.
 """
 
-from xmpp.protocol import *
-from xmpp.client import PlugIn
+from protocol import *
+from client import PlugIn
 
 class Commands(PlugIn):
     """Commands is an ancestor of Plugin and can be attached to any session.
@@ -130,7 +130,7 @@ class Commands(PlugIn):
         if not self._handlers.has_key(jid):
             self._handlers[jid]={}
         if self._handlers[jid].has_key(name):
-            raise NameError,'Command Exists'
+            raise NameError('Command Exists')
         else:
             self._handlers[jid][name]={'disco':cmddisco,'execute':cmdexecute}
         # Need to add disco stuff here
@@ -143,9 +143,9 @@ class Commands(PlugIn):
         #   Remove item from disco
         #   Remove item from command list
         if not self._handlers.has_key(jid):
-            raise NameError,'Jid not found'
+            raise NameError('Jid not found')
         if not self._handlers[jid].has_key(name):
-            raise NameError, 'Command not found'
+            raise NameError('Command not found')
         else:
             #Do disco removal here
             command = self.getCommand(name,jid)['disco']
@@ -158,9 +158,9 @@ class Commands(PlugIn):
         # We must:
         #   Return item that matches this name
         if not self._handlers.has_key(jid):
-            raise NameError,'Jid not found'
+            raise NameError('Jid not found')
         elif not self._handlers[jid].has_key(name):
-            raise NameError,'Command not found'
+            raise NameError('Command not found')
         else:
             return self._handlers[jid][name]
         
@@ -195,16 +195,16 @@ class Command_Handler_Prototype(PlugIn):
         """Plug command into the commands class"""
         # The owner in this instance is the Command Processor
         owner.addCommand(self.name,self._DiscoHandler,self.Execute,jid=jid)
-    
+
     def plugout(self,jid):
         """Remove command from the commands class"""
         self._owner.delCommand(name,jid)
 
     def getSessionID(self):
         """Returns an id for the command session"""
-	self.count = self.count+1
+        self.count += 1
         return 'cmd-%s-%d'%(self.name,self.count)
-    
+
     def Execute(self,conn,request):
         """The method that handles all the commands, and routes them to the correct method for that stage."""
         # New request or old?

@@ -266,7 +266,7 @@ class Dispatcher(PlugIn):
                 cb,args=session._expected[ID]
                 session.DEBUG("Expected stanza arrived. Callback %s(%s) found!"%(cb,args),'ok')
                 try: cb(session,stanza,**args)
-                except Exception, typ:
+                except Exception as typ:
                     if typ.__class__.__name__!='NodeProcessed': raise
             else:
                 session.DEBUG("Expected stanza arrived!",'ok')
@@ -276,7 +276,7 @@ class Dispatcher(PlugIn):
             if user or handler['system']:
                 try:
                     handler['func'](session,stanza)
-                except Exception, typ:
+                except Exception as typ:
                     if typ.__class__.__name__!='NodeProcessed': raise
                     user=0
         if user and self._defaultHandler: self._defaultHandler(session,stanza)
@@ -317,7 +317,7 @@ class Dispatcher(PlugIn):
     def send(self,stanza):
         """ Serialise stanza and put it on the wire. Assign an unique ID to it before send.
             Returns assigned ID."""
-        if type(stanza) in [type(''), type(u'')]: return self._owner_send(stanza)
+        if type(stanza) in [type(''), type('')]: return self._owner_send(stanza)
         if not isinstance(stanza,Protocol): _ID=None
         elif not stanza.getID():
             global ID
