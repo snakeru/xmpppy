@@ -24,7 +24,7 @@ All these methods takes 'disp' first argument that should be already connected
 (and in most cases already authorised) dispatcher instance.
 """
 
-from protocol import *
+from .protocol import *
 
 ### DISCO ### http://jabber.org/protocol/disco ### JEP-0030 ####################
 ### Browse ### jabber:iq:browse ### JEP-0030 ###################################

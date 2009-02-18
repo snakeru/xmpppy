@@ -23,8 +23,8 @@ Such functionality is achieved via registering "DISCO handlers" that are
 automatically called when user requests some node of your disco tree.
 """
 
-from dispatcher import *
-from client import PlugIn
+from .dispatcher import *
+from .plugin import PlugIn
 
 class Browser(PlugIn):
     """ WARNING! This class is for components only. It will not work in client mode!

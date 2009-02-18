@@ -20,8 +20,8 @@ Note that this is just a transport for data. You have to negotiate data transfer
 (via StreamInitiation most probably). Unfortunately SI is not implemented yet.
 """
 
-from protocol import *
-from dispatcher import PlugIn
+from .protocol import *
+from .plugin import PlugIn
 import base64
 
 class IBB(PlugIn):

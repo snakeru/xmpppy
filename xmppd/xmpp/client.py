@@ -1,6 +1,3 @@
-#!/usr/bin/python2.6 -3
-##   client.py
-##
 ##   Copyright (C) 2003-2005 Alexey "Snake" Nezhdanov
 ##
 ##   This program is free software; you can redistribute it and/or modify
@@ -16,13 +13,12 @@
 # $Id: client.py,v 1.36 2005/05/08 04:51:34 snakeru Exp $
 
 """
-Provides PlugIn class functionality to develop extentions for xmpppy.
 Also provides Client and Component classes implementations as the
 examples of xmpppy structures usage.
 These classes can be used for simple applications "AS IS" though.
 """
 
-import debug
+from . import debug
 Debug=debug
 Debug.DEBUGGING_IS_ON=1
 Debug.Debug.colors['socket']=debug.color_dark_gray
@@ -49,42 +45,8 @@ Debug.Debug.colors['got']=debug.color_bright_cyan
 DBG_CLIENT='client'
 DBG_COMPONENT='component'
 
-class PlugIn:
-    """ Common xmpppy plugins infrastructure: plugging in/out, debugging. """
-    def __init__(self):
-        self._exported_methods=[]
-        self.DBG_LINE=self.__class__.__name__.lower()
-
-    def PlugIn(self,owner):
-        """ Attach to main instance and register ourself and all our staff in it. """
-        self._owner=owner
-        if self.DBG_LINE not in owner.debug_flags:
-            owner.debug_flags.append(self.DBG_LINE)
-        self.DEBUG('Plugging %s into %s'%(self,self._owner),'start')
-        if self.__class__.__name__ in owner.__dict__:
-            return self.DEBUG('Plugging ignored: another instance already plugged.','error')
-        self._old_owners_methods=[]
-        for method in self._exported_methods:
-            if method.__name__ in owner.__dict__:
-                self._old_owners_methods.append(owner.__dict__[method.__name__])
-            owner.__dict__[method.__name__]=method
-        owner.__dict__[self.__class__.__name__]=self
-        if 'plugin' in self.__class__.__dict__: return self.plugin(owner)
-
-    def PlugOut(self):
-        """ Unregister all our staff from main instance and detach from it. """
-        self.DEBUG('Plugging %s out of %s.'%(self,self._owner),'stop')
-        self._owner.debug_flags.remove(self.DBG_LINE)
-        for method in self._exported_methods: del self._owner.__dict__[method.__name__]
-        for method in self._old_owners_methods: self._owner.__dict__[method.__name__]=method
-        del self._owner.__dict__[self.__class__.__name__]
-        if 'plugout' in self.__class__.__dict__: return self.plugout()
-
-    def DEBUG(self,text,severity='info'):
-        """ Feed a provided debug line to main instance's debug facility along with our ID string. """
-        self._owner.DEBUG(self.DBG_LINE,text,severity)
-
-import transports,dispatcher,auth,roster
+from . import transports,dispatcher,roster
+from . import auth
 class CommonClient:
     """ Base for Client and Component classes."""
     def __init__(self,server,port=5222,debug=['always', 'nodebuilder']):
