@@ -25,7 +25,7 @@ def messageHandler(conn,mess_node):
         message_pool[the_body]['returned'] = True
     else:
         print("Damn!")
-    
+
 
 """
     Example 1:

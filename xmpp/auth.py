@@ -27,7 +27,7 @@ from . import dispatcher
 def HH(some):
     if type(some)==string: some=bytes(some,'utf-8')
     return hashlib.md5(some).hexdigest()
-def H(some): 
+def H(some):
     if type(some)==string: some=bytes(some,'utf-8')
     return str(hashlib.md5(some).digest(),'utf-8')
 def C(some): return ':'.join(some)
@@ -204,7 +204,7 @@ class SASL(PlugIn):
             node=Node('response',attrs={'xmlns':NS_SASL},payload=[base64.encodestring(sasl_data[:-1]).replace('\n','')])
             self._owner.send(node.__str__())
         elif chal.has_key('rspauth'): self._owner.send(Node('response',attrs={'xmlns':NS_SASL}).__str__())
-        else: 
+        else:
             self.startsasl='failure'
             self.DEBUG('Failed SASL authentification: unknown challenge','error')
         raise NodeProcessed
