@@ -203,7 +203,7 @@ class JID:
             JID(node='node',domain='domain.org')
         """
         if not jid and not domain: raise ValueError('JID must contain at least domain name')
-        elif type(jid)==type(self): self.node,self.domain,self.resource=jid.node,jid.domain,jid.resource
+        elif isinstance(jid,JID): self.node,self.domain,self.resource=jid.node,jid.domain,jid.resource
         elif domain: self.node,self.domain,self.resource=node,domain,resource
         else:
             if jid.find('@')+1: self.node,jid=jid.split('@',1)
@@ -270,7 +270,7 @@ class Protocol(Node):
         if not node and xmlns: self.setNamespace(xmlns)
         if self['to']: self.setTo(self['to'])
         if self['from']: self.setFrom(self['from'])
-        if node and type(self)==type(node) and self.__class__==node.__class__ and 'id' in self.attrs: del self.attrs['id']
+        if node and isinstance(node,Protocol) and 'id' in self.attrs: del self.attrs['id']      # here was also __class__ comparison
         self.timestamp=None
         for x in self.getTags('x',namespace=NS_DELAY):
             try:
