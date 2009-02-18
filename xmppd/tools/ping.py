@@ -25,7 +25,7 @@ def messageHandler(conn,mess_node):
         message_pool[the_body]['returned'] = True
     else:
         print("Damn!")
-    
+
 
 """
     Example 1:
@@ -67,11 +67,11 @@ try:
         cl.send(Message('test@127.0.0.1',data)) #/%s'%our_resource,data))
         cl.Process(wait_time)
         i += 1
-        
-except KeyboardInterrupt:    
+
+except KeyboardInterrupt:
     print("We're just waiting for 2 secs...")
     time.sleep(2)
-    
+
 avg_time_data = []
 number_returned = 0
 for x,y in message_pool.iteritems():

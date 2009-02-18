@@ -17,14 +17,14 @@ class MessageCatcher(PlugIn):
 
     def plugout(self):
         self._owner.Dispatcher.UnregisterHandler('message',self.messageHandler)
-    
+
     def timeDurration(self,the_time):
         days = floor(the_time/60/60/24)
         hours = floor((the_time - days*60*60*24)/60/60)
         minutes = floor((the_time - days*60*60*24 - hours*60*60)/60)
         seconds = floor((the_time - days*60*60*24 - hours*60*60 - minutes*60))
         return (days,hours,minutes,seconds)
-        
+
     def readableTimeDurration(self,in_time):
         if type(in_time) != ((1,)): in_time = self.timeDurration(in_time)
         out = ''
@@ -33,7 +33,7 @@ class MessageCatcher(PlugIn):
         if in_time[2]>=1: out += '%i%s '%(in_time[2],'m')
         if in_time[3]>=1: out += '%i%s '%(in_time[3],'s')
         return out
-            
+
     def messageHandler(self,session,stanza):
         try:
             body = stanza.getBody()
@@ -45,7 +45,7 @@ class MessageCatcher(PlugIn):
                     cr = self._owner.Router._data[bare_jid][resource]
                     s = self._owner.getsession(bare_jid+'/'+resource)
                     out_body += 're:%s pri:%s last:%s up:%s\n'%(resource,cr.getPriority(),time.strftime('%m-%d-%y %H:%M:%S',time.gmtime(s.last_seen)),self.readableTimeDurration(time.time() - s.conn_since))
-        
+
             elif body == '2':
                 out_body = ''
                 data = []
@@ -59,15 +59,15 @@ class MessageCatcher(PlugIn):
                         item += 1
                 for term_session in data:
                     term_session.terminate_stream()
-                
+
                 if out_body != '':
                     out_body = 'The following resources were logged-out:\n\n' + out_body
 
                 out_body += 'You are now logged-in from one location.'
-                
+
             elif body == '3' or body == 'info':
                 out_body = 'System status for %s:\n\n'%session.ourname
-    
+
                 data = {}
                 data['soft'] = 'BlueBridge Jibber-Jabber 0.3'
                 data['no_registered'] = self._owner.DB.getNumRegistered(session.ourname)
@@ -83,7 +83,7 @@ class MessageCatcher(PlugIn):
     No. of Registered Users: %(no_registered)i
     No. of Messages Routed: %(no_msg_routed)i
     No. Authorized Connections (1/user): %(no_reg_users_conn)i"""%data
-    
+
             elif body == '4' or body == 'page':
                 someone_online = False
                 for x in self._owner.administrators[session.ourname]:
@@ -95,7 +95,7 @@ class MessageCatcher(PlugIn):
                     out_body = 'A page has been sent to an administrator.\nWe cannot guarantee that it will be returned.\n\nThank-you.'
                 else:
                     out_body = 'A page could not be sent to an administrator at this time. Please try back in an hour.\n\nThank-you.'
-    
+
             elif len(body) > 1 and body.find('5') == 0 and session.isAdmin == True:
                 self.DEBUG('MESSAGE HANDLER: %s'%body,'info')
                 JIDS = body[2:len(body)].split(' ')
@@ -105,7 +105,7 @@ class MessageCatcher(PlugIn):
                 out_body = 'Retrieving info for JID <%s> relative to JID <%s>:\n\n'%(JIDS[0],JIDS[1])
                 if jid_2 == None:
                     if jid_1 == None: JIDS[0] = JIDS[0]+'@'+session.ourname
-                    roster = self._owner.DB.pull_roster(session.ourname,JIDS[1],JIDS[0])                
+                    roster = self._owner.DB.pull_roster(session.ourname,JIDS[1],JIDS[0])
                 else:
                     roster = self._owner.DB.pull_roster(jid_2[1],jid_2[0],JIDS[0])
                 if roster == None:
@@ -113,18 +113,18 @@ class MessageCatcher(PlugIn):
                 else:
                     for x,y in roster.iteritems():
                         out_body += '%s=%s\n'%(x,y)
-                
-    
-    
-            else: 
+
+
+
+            else:
                 out_body = """Hello %s! Welcome to Help Desk.
 The following menu below will give you options to choose from:
-    
+
 1. View all locations that I am currently logged in with.
 2. Log-out all other locations except this one.
 3. Get my system status.
 4. Page an admin for later IM"""%session.getName()
-            
+
             M=Message(to=session.peer,body=out_body,frm=session.ourname)
     #        print(dir(M))
             session.enqueue(M)

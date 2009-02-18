@@ -1,21 +1,21 @@
 #!/usr/bin/python3
-# -*- coding: UTF-8 -*- 
+# -*- coding: UTF-8 -*-
 
 # XMPPD :: eXtensible Messaging and Presence Protocol Daemon
 
 # Copyright (C) 2005 Kristopher Tate / BlueBridge Technologies Group, Inc.
 # Copyright (C) 2004 Alexey Nezhdanov
-# 
+#
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
@@ -83,9 +83,9 @@ except:
 
 SERVER_MOTD = "Hello, I'm Help Desk. Type 'menu' for help."
 
-globals()['PORT_5222'] = 5222
-globals()['PORT_5223'] = 5223
-globals()['PORT_5269'] = 5269
+PORT_5222 = 5222
+PORT_5223 = 5223
+PORT_5269 = 5269
 
 SOCKER_TGUID = 'BBTECH_XMPPD' # CHANGE THIS IF YOU ARE TO USE SOCKER!
 
@@ -114,7 +114,7 @@ SESSION_BOUND       = 3
 SESSION_OPENED      = 4
 
 class fake_select:
-    def __init__(self): 
+    def __init__(self):
         ## poll flags
         self.POLLIN  = 0x0001
         self.POLLOUT = 0x0004
@@ -132,7 +132,7 @@ class fake_select:
         self.POLLHUP = 0x0010
         self.POLLNVAL = 0x0020
     class poll:
-        def __init__(self): 
+        def __init__(self):
             ## poll flags
             self.POLLIN  = 0x0001
             self.POLLOUT = 0x0004
@@ -151,7 +151,7 @@ class fake_select:
             self.POLLNVAL = 0x0020
             self._registered = {}
 
-        def register(self,fd,eventmask=None): 
+        def register(self,fd,eventmask=None):
             try:
                 self._registered[fd.fileno()] = {'fd':fd,'mask':eventmask}
                 return True
@@ -234,7 +234,7 @@ class localizer:
             return val[lang]
         except:
             if len(val.keys()) > 0:
-                return val[val.keys()[0]] 
+                return val[val.keys()[0]]
             else:
                 return ''
 
@@ -269,7 +269,7 @@ class Session:
         self.conn_since = time.time()
         self.last_seen = time.time()
         self.isAdmin = False
-        
+
         self.Dispatcher=server.Dispatcher
         self.DBG_LINE='session'
         self.DEBUG=server.Dispatcher.DEBUG
@@ -350,7 +350,7 @@ class Session:
                 self.dispatch(Error(stanza,failreason))                   # Infinite loops in case of S2S connection...
             self.deliver_queue_map,self.deliver_key_queue,self.stanza_queue={},[],[]
             return
-        elif self._session_state>=SESSION_AUTHED:       # FIXME! 
+        elif self._session_state>=SESSION_AUTHED:       # FIXME!
             #### LOCK_QUEUE
             for stanza in self.stanza_queue:
                 txt=stanza.__str__().encode('utf-8')
@@ -360,11 +360,11 @@ class Session:
                 self.deliver_key_queue.append(self._stream_pos_queued)
             self.stanza_queue=[]
             #### UNLOCK_QUEUE
-        
+
         if self.sendbuffer and select.select([],[self._sock],[])[1]:
             try:
                 # LOCK_QUEUE
-                sent=self._send(self.sendbuffer)   
+                sent=self._send(self.sendbuffer)
             except Exception as err:
                 if globals()['cmd_options'].enable_debug == True: print('Attempting to kill %i!!!\n%s'%(self._sock.fileno(),err))
                 # UNLOCK_QUEUE
@@ -386,15 +386,15 @@ class Session:
             self.lib_event.add()
         else:
             self.lib_event.add()"""
-            
+
 
 
     def libevent_write(self):
         if self.sendbuffer:
-            
+
             try:
                 # LOCK_QUEUE
-                sent=self._send(self.sendbuffer)   
+                sent=self._send(self.sendbuffer)
             except Exception as err:
                 if globals()['cmd_options'].enable_debug == True: print('Attempting to kill %i!!!\n%s'%(self._sock.fileno(),err))
                 # UNLOCK_QUEUE
@@ -466,7 +466,7 @@ class Session:
         try: barejid,resource=jid.split('/')
         except: return None
         return resource
-            
+
     def getRoster(self):
         split_jid = self.getSplitJID()
         return self._owner.DB.get(split_jid[1],split_jid[0],'roster')
@@ -480,7 +480,7 @@ class Session:
         name = self._owner.DB.get(split_jid[1],split_jid[0],'name')
         if name == None: name = '%s@%s'%split_jid[0:2]
         return name
-        
+
     def getSplitJID(self):
         return self._owner.tool_split_jid(self.peer)
 
@@ -500,7 +500,7 @@ class Session:
             return self._owner.DB.store(split_jid[1],split_jid[0],karma,'karma')
         else:
             return None
-            
+
     def feature(self,feature):
         if feature not in self.features: self.features.append(feature)
         self.unfeature(feature)
@@ -567,7 +567,7 @@ class Session:
 
 class Socker_client:
     def __init__(self,socker_host,tguid,sguid=None):
-        self._proxy = xmlrpclib.ServerProxy('http://%s'%socker_host)       
+        self._proxy = xmlrpclib.ServerProxy('http://%s'%socker_host)
 
         try: #See if the Socker server will say hello...
             ok_res = self._proxy.hello({})
@@ -581,14 +581,14 @@ class Socker_client:
             self._hostname = str(globals()['cmd_options'].hostname)
         else:
             self._hostname = None
-        
+
         if sguid == None:
             self._sguid = self.get_uuid()
         else:
             self._sguid = sguid
-        
+
         self._registered = []
-    
+
     def get_uuid(self):
         if self.conn_okay == True:
             return self._proxy.uuidgen({})
@@ -715,7 +715,7 @@ class Server:
             for x in guide:
                 port_map[str(x[0])] = x[1]
                 globals()['PORT_%s'%x[2]] = x[1]
-        
+
             for port, new_port in port_map.iteritems():
                     sock=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -723,7 +723,7 @@ class Server:
                     sock.listen(1)
                     self.registersession(sock)
                     info = self._socker.add_port(int(port),None,new_port,{'conn_max':500})
-                    if info == None: 
+                    if info == None:
                         self._socker.destroy()
                         raise Exception
 
@@ -848,7 +848,7 @@ class Server:
 #                    self.DEBUG('server','%s:%s is a server!'%(host,port),'info')
                 sess=Session(conn,self,NS_SERVER)
             self.registersession(sess)
-            if port==globals()['PORT_5223']: 
+            if port==globals()['PORT_5223']:
                 self.TLS.startservertls(sess)
         else: raise "Unknown instance type: %s"%sock
 
@@ -932,8 +932,8 @@ class Server:
         template_input = {'jid_from':unicode(peer.peer).encode('utf-8'),'jid_to':unicode(stanza['to']).encode('utf-8')}
         split_jid=self.tool_split_jid(peer.peer)
         if split_jid == None: return
-        self.DEBUG('server',self._l(SERVER_PVCY_ACCESS_CHECK)%template_input,'info')                     
-           
+        self.DEBUG('server',self._l(SERVER_PVCY_ACCESS_CHECK)%template_input,'info')
+
         #Stanza Stuff
         to=stanza['to']
         if not to: return # Not for us.
@@ -945,12 +945,12 @@ class Server:
             name=stanza.getName()
             typ=stanza.getType()
             to_roster=self.DB.get(to_domain,to_node,'roster')
-            
+
             if self.DB.get(to_domain,to_node,'anon_allow') == 'yes':
                 anon_allow=True
             else:
                 anon_allow=False
-                
+
             to_working_roster_item=None
             #Session stuff
             roster=peer.getRoster()
@@ -966,13 +966,13 @@ class Server:
             if node+'@'+domain == bareto:
                 self.DEBUG('server',self._l(SERVER_PVCY_ACCESS_CLEAR_UNLIMITED)%template_input,'info')
                 return
-            
+
             if to_roster != None:
                 for x,y in to_roster.iteritems():
                     if x == node+'@'+domain:
                         to_working_roster_item = y
                         break;
-            
+
             if to_working_roster_item == None and anon_allow==False:
                 peer.send(Error(stanza,ERR_NOT_AUTHORIZED))
                 self.DEBUG('server',self._l(SERVER_PVCY_ACCESS_NOTCLEAR_DOUBLEFALSE)%template_input,'error')
@@ -980,7 +980,7 @@ class Server:
             elif to_working_roster_item == None and anon_allow==True:
                 to_working_roster_item = {}
                 to_working_roster_item['subscription'] = 'none'
-                        
+
             for z,a in roster.iteritems():
                 if z == bareto:
                     if a['subscription']=='both' and 'subscription' in to_working_roster_item and to_working_roster_item['subscription']=='both':

@@ -52,7 +52,7 @@ class Node:
         """ Takes "tag" argument as the name of node (prepended by namespace, if needed and separated from it
             by a space), attrs dictionary as the set of arguments, payload list as the set of textual strings
             and child nodes that this node carries within itself and "parent" argument that is another node
-            that this one will be the child of. Also the __init__ can be provided with "node" argument that is 
+            that this one will be the child of. Also the __init__ can be provided with "node" argument that is
             either a text string containing exactly one node or another Node instance to begin with. If both
             "node" and other arguments is provided then the node initially created as replica of "node"
             provided and then modified to be compliant with other arguments."""
@@ -87,7 +87,7 @@ class Node:
             val = ustr(self.attrs[key])
             s = s + ' %s="%s"' % ( key, XMLescape(val) )
         s = s + ">"
-        cnt = 0 
+        cnt = 0
         if self.kids:
             if fancy: s = s + "\n"
             for a in self.kids:
@@ -164,7 +164,7 @@ class Node:
             try: ret.append(self.kids[i])
             except IndexError: pass
         return ret
-    def getTag(self, name, attrs={}, namespace=None): 
+    def getTag(self, name, attrs={}, namespace=None):
         """ Filters all child nodes using specified arguments as filter.
             Returns the first found or None if not found. """
         return self.getTags(name, attrs, namespace, one=1)
@@ -200,8 +200,8 @@ class Node:
     def setNamespace(self, namespace):
         """ Changes the node namespace. """
         self.namespace=namespace
-    def setParent(self, node): 
-        """ Sets node's parent to "node". WARNING: do not checks if the parent already present 
+    def setParent(self, node):
+        """ Sets node's parent to "node". WARNING: do not checks if the parent already present
             and not removes the node from the list of childs of previous parent. """
         self.parent = node
     def setPayload(self,payload,add=0):
@@ -268,7 +268,7 @@ DBG_NODEBUILDER = 'nodebuilder'
 class NodeBuilder:
     """ Builds a Node class minidom from data parsed to it. This class used for two purposes:
         1. Creation an XML Node from a textual representation. F.e. reading a config file. See an XML2Node method.
-        2. Handling an incoming XML stream. This is done by mangling 
+        2. Handling an incoming XML stream. This is done by mangling
            the __dispatch_depth parameter and redefining the dispatch method.
         You do not need to use this class directly if you do not designing your own XML handler."""
     def __init__(self,data=None,initial_node=None):

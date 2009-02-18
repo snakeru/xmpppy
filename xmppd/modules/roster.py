@@ -10,7 +10,7 @@ class ROSTER(PlugIn):
     def plugin(self,server):
         server.Dispatcher.RegisterHandler('iq',self.RosterIqHandler,typ='set',ns=NS_ROSTER,xmlns=NS_CLIENT)
         server.Dispatcher.RegisterHandler('iq',self.RosterIqHandler,typ='get',ns=NS_ROSTER,xmlns=NS_CLIENT)
-    
+
     def RosterAdd(self,session,stanza):
         s_split_jid = session.getSplitJID()
         the_roster = session.getRoster()
@@ -22,20 +22,20 @@ class ROSTER(PlugIn):
                     info = {}
                     name = kid.getAttr('name')
                     if name != None: info.update({'name':name})
-                    
+
                     subscription = kid.getAttr('subscription')
                     if subscription != None: info.update({'subscription':subscription})
                     elif kid.getAttr('jid') not in the_roster.keys() or the_roster[kid.getAttr('jid')].has_key('subscription') == False:
                         self.DEBUG('###ROSTER+: Wow, subscription is not active -- better create one pronto!','warn')
                         kid.setAttr('subscription','none')
 
-                    ask = kid.getAttr('ask') 
+                    ask = kid.getAttr('ask')
                     if ask != None:
                         info.update({'ask':ask})
                     elif ask == 'InternalDelete':
                         kid.delAttr('ask')
                         self._owner.DB.del_from_roster_jid(s_split_jid[1],s_split_jid[0],split_jid[0]+'@'+split_jid[1],'ask')
-                            
+
                     self.DEBUG(unicode(info).encode('utf-8'),'error')
                     self._owner.DB.save_to_roster(s_split_jid[1],s_split_jid[0],split_jid[0]+'@'+split_jid[1],info)
                     if kid.kids != []:
@@ -43,9 +43,9 @@ class ROSTER(PlugIn):
                         for grandkid in kid.kids:
                             if grandkid.getName() == 'group':
                                 group_list += [grandkid.getData()]
-                        
-                        self._owner.DB.save_groupie(s_split_jid[1],s_split_jid[0],split_jid[0]+'@'+split_jid[1],group_list)    
-                        
+
+                        self._owner.DB.save_groupie(s_split_jid[1],s_split_jid[0],split_jid[0]+'@'+split_jid[1],group_list)
+
     def RosterRemove(self,session,stanza):
         s_split_jid = session.getSplitJID()
         if stanza.getType() == 'set' and stanza.getTag('query').kids != []:
@@ -57,17 +57,17 @@ class ROSTER(PlugIn):
                     split_jid = self._owner.tool_split_jid(kid.getAttr('jid'))
                     p = Presence(to=kid.getAttr('jid'),frm=session.getBareJID(),typ='unsubscribed')
                     session.dispatch(p)
-                    
+
                     session.enqueue(stanza)
-                    
+
                     self._owner.DB.del_from_roster(s_split_jid[1],s_split_jid[0],kid.getAttr('jid'))
                     self._owner.DB.del_groupie(s_split_jid[1],s_split_jid[0],kid.getAttr('jid'))
-                    
+
                     #Tell 'em we just road-off into the sunset
                     split_jid = self._owner.tool_split_jid(kid.getAttr('jid'))
                     p = Presence(to=kid.getAttr('jid'),frm=session.peer,typ='unavailable')
                     session.dispatch(p)
-                    
+
     def RosterPushOne(self,session,stanza,mode='set',options=None):
         self.DEBUG('#ROSTER#: Pushing one out!','warn')
         #Stanza Stuff
@@ -107,7 +107,7 @@ class ROSTER(PlugIn):
                     atag.setAttr(ok,od)
             if atag.getAttr('name') == None and name != None: atag.setAttr('name',name)
 
-            ask = atag.getAttr('ask') 
+            ask = atag.getAttr('ask')
             if ask == 'InternalDelete':
                 atag.delAttr('ask')
                 self._owner.DB.del_from_roster_jid(s_split_jid[1],s_split_jid[0],bareto,'ask')
@@ -133,13 +133,13 @@ class ROSTER(PlugIn):
             if split_jid != None:
                 name = self._owner.DB.get(split_jid[1],split_jid[0],'name')
             else:
-                name = None 
+                name = None
             groups = session.getGroups()
             atag.setAttr('jid',k)
             for x,y in v.iteritems():
                 atag.setAttr(x,y)
             if atag.getAttr('name') == None and name != None: atag.setAttr('name',name)
-            
+
             if groups != None:
                 for gn,gm in groups.iteritems():
                     for igm in gm:
@@ -166,5 +166,5 @@ class ROSTER(PlugIn):
             session.send(IQ)
         elif stanza.getType() == 'get' and stanza.getTag('query').kids == []:
             self.RosterPush(session,stanza,'result') #How's the result???
-        
+
         raise NodeProcessed

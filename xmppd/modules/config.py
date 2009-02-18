@@ -26,8 +26,8 @@ class Config(PlugIn):
         server.administrators={}
         try: server.sqlite_db = configfile.get('server','sqlite_file')
         except: server.sqlite_db = None
-        
-        
+
+
         for name in configfile.get('server','servernames').split(','):
             server.DEBUG('server','Added new server (%s) from config!'%name.split(),'info')
             server.servernames.append(name.strip())
@@ -36,7 +36,7 @@ class Config(PlugIn):
             for admin in configfile.get(name,'admins').split(','):
                 server.DEBUG('server','Added new admin (%s) for server (%s) from config!'%(admin.split(),name),'info')
                 server.administrators[name].append(admin.strip())
-            
+
         try: server.sslcertfile=configfile.get('server','ssl-cert')
         except: server.sslcertfile=None
         try: server.sslkeyfile=configfile.get('server','ssl-key')
