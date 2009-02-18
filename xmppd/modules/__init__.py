@@ -2,10 +2,10 @@
 
 import os
 #from psyco.classes import *
-
-for m in os.listdir('modules'):
-    if m[:2]=='__' or m[-3:]<>'.py': continue
-    exec "import "+m[:-3]
+from . import config,db_fake,stream,dialback,router,message,jep0078,roster
+#for m in os.listdir('modules'):
+#    if m[:2]=='__' or m[-3:]!='.py': continue
+#    exec "import ."+m[:-3]
 
 addons = [
 # System stuff

@@ -5,7 +5,8 @@
 # $Id: config.py,v 1.3 2004/10/03 17:47:50 snakeru Exp $
 
 from xmpp import *
-import ConfigParser
+
+import configparser as ConfigParser
 
 cfgfile='xmppd.cfg'
 

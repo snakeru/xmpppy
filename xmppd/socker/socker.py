@@ -72,7 +72,7 @@ class Client:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         #Now connect
         destination = (self._owner.routes[type_guid][server_guid]['info']['host'], self._owner.routes[type_guid][server_guid]['info']['port'])
-        print "connecting to ", destination
+        print("connecting to ", destination)
         sock.connect(destination)
 
         s = Client(sock,self._owner,type_guid,server_guid,True)
@@ -116,7 +116,7 @@ class Client:
         if self.linked == True:
             linkup = self._owner.sockets[self._owner.links[self.fileno()]['fn']]['sock']
                         
-            print "Terminating %s::%s"%(self.fileno(),linkup.fileno())
+            print("Terminating %s::%s"%(self.fileno(),linkup.fileno()))
             self._owner.link_manager('r',self)
             self._owner.unregistersession(linkup)
             # Handle forward socket
@@ -159,7 +159,7 @@ class Router:
             self.leventobjs[s.fileno()].add() #Add agent to the queue.
             
         self.SESS_LOCK.release()
-        print "XMLRPC has been registered to port %i"%globals()['XMLRPC_PORT']
+        print("XMLRPC has been registered to port %i"%globals()['XMLRPC_PORT'])
         return True
 
     def register_port(self,outside_port,type_guid,server_guid,server_host,server_port,options=None):  
@@ -171,7 +171,7 @@ class Router:
             s.listen(1)
             
             self.port_pool += [outside_port]
-            print "We have registered port No. %i"%outside_port
+            print("We have registered port No. %i"%outside_port)
             r = self.registersession(s,1,type_guid,server_guid,server_host,server_port,options)
             return {'mode':1,'s':r}
         else:
@@ -183,12 +183,12 @@ class Router:
             if mode == 'a' and server != None:
                 self.links[client.fileno()] = {'fn':server.fileno(),'typ':'server'}
                 self.links[server.fileno()] = {'fn':client.fileno(),'typ':'client'}
-                print "Link up between %s and %s"%(client.fileno(),server.fileno())
+                print("Link up between %s and %s"%(client.fileno(),server.fileno()))
             elif mode == 'r':
                 other = self.links[client.fileno()]['fn']
                 del self.links[client.fileno()]
                 del self.links[other]
-                print "Link down between %s and %s"%(client.fileno(),other)
+                print("Link down between %s and %s"%(client.fileno(),other))
         except:
             pass
             
@@ -213,7 +213,7 @@ class Router:
             
             if mode == 3:
                 self.SESS_LOCK.release()
-                print "registered secondary as type %s" % str(mode)
+                print("registered secondary as type %s" % str(mode))
                 return s
             else:
                 self.types_by_port[str(s.getsockname()[1])] = type_guid
@@ -227,7 +227,7 @@ class Router:
         if self.leventobjs[s.fileno()] != None:
             self.leventobjs[s.fileno()].add() #Add agent to the queue.
         self.SESS_LOCK.release()
-        print "registered socket %s as type %s" % (s.fileno(),str(mode))
+        print("registered socket %s as type %s" % (s.fileno(),str(mode)))
         return s
 
     def unregistersession(self,s=None,type_guid=None,server_guid=None):          
@@ -238,7 +238,7 @@ class Router:
                 except:
                     return False            
 
-#        print 'keys!!!!',len(self.routes[type_guid].keys()), self.routes[type_guid].keys()
+#        print('keys!!!!',len(self.routes[type_guid].keys()), self.routes[type_guid].keys())
         if type_guid != None and len(self.routes[type_guid].keys()) <= 2:
             s = self.routes[type_guid]['bind']
             self.unregister_port(s)
@@ -266,9 +266,9 @@ class Router:
                 self.leventobjs[s.fileno()].delete() # Kill libevent event
                 del self.leventobjs[s.fileno()]
             del self.sockets[s.fileno()] # Destroy the record
-            print "UNregistered socket %s"%s.fileno()
+            print("UNregistered socket %s"%s.fileno())
         else:
-            print "UNregistered socket %s::%s"%(type_guid,server_guid)
+            print("UNregistered socket %s::%s"%(type_guid,server_guid))
         return True
 
     def unregister_port(self,s):
@@ -281,7 +281,7 @@ class Router:
             port = s.getsockname()[1]
             self.port_pool.remove(port)
             del self.types_by_port[str(port)]
-            print "UNREGISTERED PORT %i"%port
+            print("UNREGISTERED PORT %i"%port)
             return True
         except:
             return False
@@ -303,7 +303,7 @@ class Router:
                 type_guid = self.types_by_port[str(port)]
                 server = self.get_good_server(type_guid)
                 if server != None:               
-                    print "Using server %s"%server
+                    print("Using server %s"%server)
                     sess = Client(conn,self,type_guid,server)
                     self.registersession(sess,0,self.types_by_port[str(port)],server)
             elif port == globals()['XMLRPC_PORT']:
@@ -325,7 +325,7 @@ class Router:
                     if getattr(result,'faultCode',None) != None:
                         response = xmlrpclib.dumps(result)            
                     else:
-                        print result
+                        print(result)
                         response = xmlrpclib.dumps(result, methodresponse=1)
         
                 except:
@@ -344,7 +344,7 @@ class Router:
             if server == 'bind': continue
             if info['info'].has_key('conn_max') == False:
                 info['info']['conn_max'] = 1000 # Change all of this later
-            print "Info:", server, len(info['clients']), info['info']['conn_max']
+            print("Info:", server, len(info['clients']), info['info']['conn_max'])
             if len(info['clients']) < info['info']['conn_max']:
                 out = server
                 break
@@ -383,12 +383,12 @@ class Router:
         out = str(a.read()).replace("\n", "")
         a.close()
         return out
-        
+
     def export_hello(self,inpt):
         return {'code':1,'msg':'Server is online!'}
 
     def export_hostname(self,inpt):
-        print inpt
+        print(inpt)
         if inpt.has_key('_socket_info'):
             return {'code':1,'hostname':inpt['_socket_info'][0]}
         else:

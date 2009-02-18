@@ -3,7 +3,7 @@
 import sys,os,xmpp
 
 if len(sys.argv) < 2:
-    print "Syntax: xsend JID text"
+    print("Syntax: xsend JID text")
     sys.exit(0)
 
 tojid=sys.argv[1]
@@ -17,7 +17,7 @@ if os.access(os.environ['HOME']+'/.xsend',os.R_OK):
 for mandatory in ['jid','password']:
     if mandatory not in jidparams.keys():
         open(os.environ['HOME']+'/.xsend','w').write('#JID=romeo@montague.net\n#PASSWORD=juliet\n')
-        print 'Please point ~/.xsend config file to valid JID for sending messages.'
+        print('Please point ~/.xsend config file to valid JID for sending messages.')
         sys.exit(0)
 
 jid=xmpp.protocol.JID(jidparams['jid'])

@@ -1,4 +1,4 @@
-#!/usr/bin/python2.6 -3
+#!/usr/bin/python3
 # -*- coding: UTF-8 -*- 
 
 # XMPPD :: eXtensible Messaging and Presence Protocol Daemon
@@ -57,19 +57,21 @@ parser.add_option("-i",
 (cmd_options, cmd_args) = parser.parse_args()
 
 if cmd_options.enable_psyco == True:
-    if globals()['cmd_options'].enable_debug == True: print "Starting PsyCo..."
+    if globals()['cmd_options'].enable_debug == True: print("Starting PsyCo...")
     try:
         import psyco
         psyco.log()
         psyco.full()
-        if globals()['cmd_options'].enable_debug == True: print "PsyCo is loaded."
+        if globals()['cmd_options'].enable_debug == True: print("PsyCo is loaded.")
     except:
-        if globals()['cmd_options'].enable_debug == True: print "ERR Loading PsyCo!"
+        if globals()['cmd_options'].enable_debug == True: print("ERR Loading PsyCo!")
 
-
+import xmpp
 from xmpp import *
 import traceback
-import socket,select,random,os,sys,thread,errno,time,threading
+import _thread
+import _thread as thread
+import socket,select,random,os,sys,errno,time,threading
 
 if globals()['cmd_options'].socker_info != None: import xmlrpclib
 
@@ -217,36 +219,36 @@ class localizer:
             self._lang = DEFAULT_LANG
         else:
             self._lang = lang
-        
+
     def set_lang(self,lang):
         self._lang = lang
         return True
-        
+
     def localize(self,val,lang=None):
         if lang == None or lang not in val:
             lang = self._lang
         if lang not in val and self._default in val:
             lang = self._default
-            
+
         try:
             return val[lang]
-        except: 
+        except:
             if len(val.keys()) > 0:
                 return val[val.keys()[0]] 
             else:
                 return ''
-    
+
     def build_localeset(self,records):
         for record in records.split('\n')[1:]:
             var,code,text=record.split(' -- ')
             name=var.upper().replace('-','_')
-            if globals()['cmd_options'].enable_debug == True: print 'adding ' + name + '::' + code
+            if globals()['cmd_options'].enable_debug == True: print('adding ' + name + '::' + code)
             if name in globals():
                 globals()[name].update({code:text})
             else:
                 globals()[name] = {code:text}
         del var,code,text
-        
+
 class Session:
     def __init__(self,socket,server,xmlns,peer=None):
         self.xmlns=xmlns
@@ -323,7 +325,7 @@ class Session:
     def send(self,chunk):
         try:
             if isinstance(chunk,Node): chunk = unicode(chunk).encode('utf-8')
-            elif type(chunk)==type(u''): chunk = chunk.encode('utf-8')
+            elif type(chunk)==type(''): chunk = chunk.encode('utf-8')
             #self.enqueue(chunk)
         except:
             pass
@@ -363,8 +365,8 @@ class Session:
             try:
                 # LOCK_QUEUE
                 sent=self._send(self.sendbuffer)   
-            except Exception, err:
-                if globals()['cmd_options'].enable_debug == True: print 'Attempting to kill %i!!!\n%s'%(self._sock.fileno(),err)
+            except Exception as err:
+                if globals()['cmd_options'].enable_debug == True: print('Attempting to kill %i!!!\n%s'%(self._sock.fileno(),err))
                 # UNLOCK_QUEUE
                 self.set_socket_state(SOCKET_DEAD)
                 self.DEBUG(self._owner._l(SESSION_SEND_ERROR),'error')
@@ -379,7 +381,7 @@ class Session:
             # UNLOCK_QUEUE
         """
         elif self.lib_event == None:
-            if globals()['cmd_options'].enable_debug == True: print 'starting-up libevent write-event for %i'%self._sock.fileno()
+            if globals()['cmd_options'].enable_debug == True: print('starting-up libevent write-event for %i'%self._sock.fileno())
             self.lib_event = event.write(self._sock,self.libevent_write)
             self.lib_event.add()
         else:
@@ -393,8 +395,8 @@ class Session:
             try:
                 # LOCK_QUEUE
                 sent=self._send(self.sendbuffer)   
-            except Exception,err:
-                if globals()['cmd_options'].enable_debug == True: print 'Attempting to kill %i!!!\n%s'%(self._sock.fileno(),err)
+            except Exception as err:
+                if globals()['cmd_options'].enable_debug == True: print('Attempting to kill %i!!!\n%s'%(self._sock.fileno(),err))
                 # UNLOCK_QUEUE
                 self.set_socket_state(SOCKET_DEAD)
                 self.DEBUG(self._owner._l(SESSION_SEND_ERROR),'error')
@@ -572,10 +574,10 @@ class Socker_client:
             if ok_res['code'] == 1: self.conn_okay = True
         except:
             self.conn_okay = False
-            
+
         self._tguid = tguid
         if globals()['cmd_options'].hostname != None:
-            if globals()['cmd_options'].enable_debug == True: print "[SOCKER] hostname set to <%s>" % globals()['cmd_options'].hostname
+            if globals()['cmd_options'].enable_debug == True: print("[SOCKER] hostname set to <%s>" % globals()['cmd_options'].hostname)
             self._hostname = str(globals()['cmd_options'].hostname)
         else:
             self._hostname = None
@@ -611,7 +613,7 @@ class Socker_client:
         return self._tguid
 
     def add_port(self,outside_port,host,port,options=None):
-        if globals()['cmd_options'].enable_debug == True: print "[SOCKER] attempting to add route to Socker [%s]"%str((outside_port,host,port,options))
+        if globals()['cmd_options'].enable_debug == True: print("[SOCKER] attempting to add route to Socker [%s]"%str((outside_port,host,port,options)))
         if host == None and self._hostname != None:
             host = self._hostname
         elif host == None and self._hostname == None:
@@ -698,15 +700,17 @@ class Server:
             self.feature(addon.NS)
         self.routes={}
         self._socker = None
-        if globals()['cmd_options'].socker_info != None:
+        if globals()['cmd_options'].socker_info:
             self._socker = Socker_client(globals()['cmd_options'].socker_info,globals()['SOCKER_TGUID'])
-        
+
         if self._socker != None and self._socker.conn_okay == True:
-            if globals()['cmd_options'].enable_debug == True: print "[SOCKER] Socker(tm) support is enabled."; print "[SOCKER] Randomizing incoming connection ports."
-            
+            if globals()['cmd_options'].enable_debug:
+                print("[SOCKER] Socker(tm) support is enabled.")
+                print("[SOCKER] Randomizing incoming connection ports.")
+
             #Generate port map
             guide = [[globals()['PORT_5222'],self.pick_rand(),'5222'],[globals()['PORT_5223'],self.pick_rand(),'5223'],[globals()['PORT_5269'],self.pick_rand(),'5269']]
-            
+
             port_map = {}
             for x in guide:
                 port_map[str(x[0])] = x[1]
@@ -725,7 +729,7 @@ class Server:
 
 
         else:
-            if globals()['cmd_options'].enable_debug == True and globals()['cmd_options'].socker_info != None: print "[SOCKER] Socker(tm) support could not be enabled. Please make sure that the Socker server is active."
+            if globals()['cmd_options'].enable_debug == True and globals()['cmd_options'].socker_info != None: print("[SOCKER] Socker(tm) support could not be enabled. Please make sure that the Socker server is active.")
             self._socker = None
             for port in [globals()['PORT_5222'],globals()['PORT_5223'],globals()['PORT_5269']]:
                 sock=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -906,10 +910,10 @@ class Server:
         return s
 
     def _connect_session(self,session,domain):
-        print session.DEBUG(self._owner._l(SERVER-S2S-ATTEMPT-CONNECTION)%{'server':domain},'info')
+        print(session.DEBUG(self._owner._l(SERVER-S2S-ATTEMPT-CONNECTION)%{'server':domain},'info'))
         try: session._sock.connect((domain,5269))
-        except socket.error,err:
-            print session.DEBUG(self._l(SERVER_S2S_THREAD_ERROR)%err,'error')
+        except socket.error as err:
+            print(session.DEBUG(self._l(SERVER_S2S_THREAD_ERROR)%err,'error'))
             self._owner.num_servers -= 1
             session.set_session_state(SESSION_BOUND)
             session.set_socket_state(SOCKET_DEAD)
@@ -990,7 +994,6 @@ class Server:
                         self.DEBUG('server',self._l(SERVER_PVCY_ACCESS_NOTCLEAR_MODETO)%template_input,'error')
                         raise NodeProcessed # Take the blue pill
 
-            
             if anon_allow == True or str(to) in self.servernames:
                 return
             else:
@@ -998,7 +1001,7 @@ class Server:
                 self.DEBUG('server',self._l(SERVER_PVCY_ACCESS_NOTCLEAR_FALSEANON)%template_input,'error')
                 raise NodeProcessed # Take the blue pill
         return
-        
+
     def Dialback(self,session):
         session.terminate_stream(STREAM_UNSUPPORTED_VERSION)
 
@@ -1032,8 +1035,8 @@ class get_input(threading.Thread):
                 self._owner.__init__(['always'],True)
 
             elif the_input == 'sys_debug':
-                print sys.exc_info()
-                print traceback.print_exc()
+                print(sys.exc_info())
+                print(traceback.print_exc())
             elif the_input.split(' ')[0] == 'restart':
 
                 import modules
@@ -1054,7 +1057,7 @@ class get_input(threading.Thread):
                                 del self._owner.__dict__[addon().__class__.__name__]
                                 if 'plugout' in addon().__class__.__dict__: addon().plugout()
                                 self._owner.unfeature(addon.NS)
-                                
+
                                 addon().PlugIn(s)
                             else:
                                 addon().PlugIn(s)
@@ -1073,7 +1076,7 @@ class get_input(threading.Thread):
                         self._owner.feature(addon.NS)
 
             elif the_input.split(' ')[0] == 'stop':
-    
+
                 import modules
                 reload(modules)
                 for addon in modules.addons:
@@ -1081,7 +1084,7 @@ class get_input(threading.Thread):
                         if issubclass(addon,PlugIn):
                             if addon().__class__.__name__ in self._owner.__dict__:
             #                    self.DEBUG('server','Plugging-out?','info')
-            
+
                                 self._owner.DEBUG('server','Plugging %s out of %s.'%(addon(),s),'stop')
                                 if addon().DBG_LINE in self._owner.debug_flags:
                                     self._owner.debug_flags.remove(addon().DBG_LINE)
@@ -1118,12 +1121,11 @@ if __name__=='__main__':
     if globals()['cmd_options'].enable_debug == True:
         debug_mode = ['always']
     else:
-        debug_file = file('xmppd.log','w+')
+        debug_file = open('xmppd.log','w+')
     s=Server(debug_mode,False,debug_file)
     inpt_service = get_input(s)
     inpt_service.setDaemon(True)
 
-            
     GLOBAL_TERMINATE = False
     if cmd_options.enable_interactive == True: inpt_service.start()
     while GLOBAL_TERMINATE == False:
@@ -1137,7 +1139,7 @@ if __name__=='__main__':
         except:
             if 'event' in globals().keys(): event.abort()
             if globals()['cmd_options'].enable_debug == True:
-                print 'Check your traceback file, please!'
+                print('Check your traceback file, please!')
             tbfd = file('xmppd.traceback','a')
             tbfd.write(str('\nTRACEBACK REPORT FOR XMPPD for %s\n' + '='*55 + '\n')%time.strftime('%c'))
             #write traceback

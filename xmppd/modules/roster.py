@@ -151,7 +151,7 @@ class ROSTER(PlugIn):
         session.send(rep)
 
     def RosterIqHandler(self,session,stanza):
-        #print "session info:", dir(session)
+        #print("session info:", dir(session))
         s_split_jid = self._owner.tool_split_jid(session.peer)
         if stanza.getType() == 'set' and stanza.getTag('query').kids != []:
             for kid in stanza.getTag('query').kids:

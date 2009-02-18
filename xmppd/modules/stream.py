@@ -6,7 +6,8 @@
 
 from xmpp import *
 from xmppd import *
-import socket,thread
+import socket,_thread
+import _thread as thread
 #from tlslite.api import *
 
 class TLS(PlugIn):
@@ -208,7 +209,7 @@ class SASL(PlugIn):
         except:
             session.terminate_stream(STREAM_BAD_REQUEST)
             raise NodeProcessed
-        self.DEBUG('Got challenge: '+`data`,'ok')
+        self.DEBUG('Got challenge: '+repr(data),'ok')
         for pair in data.split(','):
             if pair.find('=')==-1:
                 session.sasl['otherdata']=pair

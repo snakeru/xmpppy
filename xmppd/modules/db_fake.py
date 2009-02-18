@@ -180,7 +180,7 @@ class DB(PlugIn):
         try:
             del(db[domain][node]['roster'][jid])
             return True
-        except KeyError, err:
+        except KeyError as err:
             self.DEBUG('DB ERR: A Client tried to remove a contact that wasn\'t even added! (%s::%s::%s)'%(domain,node,jid),'error') 
             return False
 
@@ -189,15 +189,15 @@ class DB(PlugIn):
         try:
             del(db[domain][node]['roster'][jid][what])
             return True
-        except KeyError, err:
+        except KeyError as err:
             self.DEBUG('DB ERR: A Client tried to remove a contact attr that wasn\'t even added! (%s::%s::%s)'%(domain,node,jid),'error') 
             return False
 
     def save_groupie(self,domain,node,jid,groups):
         temp = []
         for x in groups:
-            if type(x)==type(u''): x = x.encode('utf-8')
-            elif type(x)==type(u''): x = unicode(x).encode('utf-8')
+            if type(x)==type(''): x = x.encode('utf-8')
+            elif type(x)==type(''): x = unicode(x).encode('utf-8')
             temp += [x]
         group_list = x
         self.DEBUG("Saving groupie jid to database %s-->(%s) [%s]:\n"%(jid,node+'@'+domain,unicode(groups).encode('utf-8')),'info')
@@ -213,7 +213,7 @@ class DB(PlugIn):
             for gn,gm in db[domain][node]['groups'].iteritems():
                 if jid in db[domain][node]['groups'][gn]:
                     db[domain][node]['groups'][gn].remove(jid)
-        except Exception, err:
+        except Exception as err:
             self.DEBUG('DB ERR: A groupie went mad! %s::%s::%s'%(domain,node,jid),'error') 
     
     def get(self,domain,node,what):
