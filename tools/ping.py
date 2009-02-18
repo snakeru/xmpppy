@@ -24,7 +24,7 @@ def messageHandler(conn,mess_node):
         message_pool[the_body]['fin'] = time.time()
         message_pool[the_body]['returned'] = True
     else:
-        print "Damn!"
+        print("Damn!")
     
 
 """
@@ -62,14 +62,14 @@ try:
     while i < interation_max:
         the_time = time.time()
         data = sha.new(str(the_time)).hexdigest()
-        print len(data)
+        print(len(data))
         message_pool.update({data:{'start':the_time,'fin':0.0,'returned':False}})
         cl.send(Message('test@127.0.0.1',data)) #/%s'%our_resource,data))
         cl.Process(wait_time)
         i += 1
         
 except KeyboardInterrupt:    
-    print "We're just waiting for 2 secs..."
+    print("We're just waiting for 2 secs...")
     time.sleep(2)
     
 avg_time_data = []
@@ -83,4 +83,4 @@ avg_time = 0.0
 for atime in avg_time_data:
     avg_time += atime
 avg_time = avg_time / len(avg_time_data)
-print "\n\n\nAverage round-trip: %f\n%i stanzas returned out of %i which is %f%%" % (avg_time,number_returned,len(message_pool.keys()),(number_returned/len(message_pool.keys())*1.0)*100)
+print("\n\n\nAverage round-trip: %f\n%i stanzas returned out of %i which is %f%%" % (avg_time,number_returned,len(message_pool.keys()),(number_returned/len(message_pool.keys())*1.0)*100))

@@ -24,7 +24,7 @@ def messageHandler(conn,mess_node):
         message_pool[the_body]['fin'] = time.time()
         message_pool[the_body]['returned'] = True
     else:
-        print "Damn!"
+        print("Damn!")
     
 
 """
@@ -66,22 +66,22 @@ try:
         cl.send(Message('test@127.0.0.1/%s'%our_resource,data))
         cl.Process(wait_time)
         i += 1
-        
-        """        
+
+        """
         if multiply == True and size * 2 == 262144: multiply = False
         elif multiply == False and size / 2 == 1: multiply = True
         if multiply == True:
             size *= 2
         else:
             size /= 2
-        print "Size = %i\n"%size
+        print("Size = %i\n"%size)
         """
-        print 'sent\n'
-        
-except KeyboardInterrupt:    
-    print "We're just waiting for 2 secs..."
+        print('sent\n')
+
+except KeyboardInterrupt:
+    print("We're just waiting for 2 secs...")
     time.sleep(2)
-    
+
 avg_time_data = []
 number_returned = 0
 for x,y in message_pool.iteritems():
@@ -92,6 +92,6 @@ avg_time = 0
 for a_time in avg_time_data:
     avg_time += a_time
 avg_time = avg_time / len(avg_time_data)
-print "\n\n\nAverage round-trip: %f\n%i stanzas returned out of %i which is %i%%" % (avg_time,number_returned,len(message_pool.keys()),(number_returned/(len(message_pool.keys())*1.0))*100)
+print("\n\n\nAverage round-trip: %f\n%i stanzas returned out of %i which is %i%%" % (avg_time,number_returned,len(message_pool.keys()),(number_returned/(len(message_pool.keys())*1.0))*100))
 
 cl.disconnect()

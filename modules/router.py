@@ -43,7 +43,7 @@ class Router(PlugIn):
 
             try: priority=int(stanza.getTagData('priority'))
             except: priority=0
-            bp.T.priority=`priority`
+            bp.T.priority=str(priority)
             self._owner.activatesession(session)
 
             show=stanza.getTag('show')
@@ -141,7 +141,7 @@ class Router(PlugIn):
                         p.setAttr('type','probe')
                         session.dispatch(p)
                         self.DEBUG('Finished for "%s"'%x,'info')
-            except Exception, err:
+            except Exception as err:
                 self.DEBUG("PRESENCE_BROADCAST_ERR: %s\nx:%s\ny:%s"%(err,x,y),'error')
 
     def update(self,barejid):

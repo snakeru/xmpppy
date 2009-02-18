@@ -6,7 +6,8 @@
 
 from xmpp import *
 from xmppd import *
-import socket,thread,hashlib
+import socket,_thread,hashlib
+import _thread as thread
 
 class Dialback(PlugIn):
     """ 4. <db:result from= to= /> ->
@@ -29,13 +30,13 @@ class Dialback(PlugIn):
         if to not in self._owner.servernames:
             self.DEBUG('Received dialback key for unknown server.','error')
             session.terminate_stream(STREAM_HOST_UNKNOWN)
-        elif not frm or frm<>frm.getDomain():
+        elif not frm or frm!=frm.getDomain():
             self.DEBUG('Received dialback key from invalid server.','error')
             session.terminate_stream(STREAM_INVALID_FROM)
         elif name=='result' and session.TYP=='server':
             # (4) Received an dialback key. We should verify it.
             key=stanza.getData()
-            self.DEBUG('Received dialback key %s (%s->%s).'%(`key`,frm,to),'info')
+            self.DEBUG('Received dialback key %s (%s->%s).'%(repr(key),frm,to),'info')
             # Now we should form a request and send it to authoritative server
             req=Node('db:verify',{'from':session.ourname,'to':frm,'id':session.ID},[key])
             s=self._owner.getsession(frm)
@@ -62,7 +63,7 @@ class Dialback(PlugIn):
                 if s.ID==stanza['id']:
                     rep=Node('db:result',{'from':to,'to':frm,'type':stanza['type']})
                     s.send(rep)
-                    if stanza['type']<>'valid': s.terminate_stream(STREAM_NOT_AUTHORIZED)
+                    if stanza['type']!='valid': s.terminate_stream(STREAM_NOT_AUTHORIZED)
                     else:
                         s.peer=frm
                         s.set_session_state(SESSION_AUTHED)

@@ -126,8 +126,8 @@ The following menu below will give you options to choose from:
 4. Page an admin for later IM"""%session.getName()
             
             M=Message(to=session.peer,body=out_body,frm=session.ourname)
-    #        print dir(M)
+    #        print(dir(M))
             session.enqueue(M)
-        except Exception, val:
+        except Exception as val:
             self.DEBUG('MESSAGE HANDLER CRASHED!\n%s'%val,'error')
         raise NodeProcessed
