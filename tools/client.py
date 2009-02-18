@@ -20,7 +20,7 @@ def iqHandler(conn,iq_node):
 def messageHandler(conn,mess_node):
     global message_pool
     the_body = mess_node.getBody()
-    if message_pool.has_key(the_body):
+    if the_body in message_pool:
         message_pool[the_body]['fin'] = time.time()
         message_pool[the_body]['returned'] = True
     else:

@@ -198,9 +198,9 @@ class Router:
         if mode == 0:
             self.routes[type_guid][server_guid]['clients'] += [s]
         elif mode == 1 or mode == 3:
-            if self.routes.has_key(type_guid) == False: self.routes[type_guid] = {}
+            if type_guid not in self.routes: self.routes[type_guid] = {}
             if mode == 1: self.routes[type_guid]['bind'] = s
-            if self.routes[type_guid].has_key(server_guid) == False:
+            if server_guid not in self.routes[type_guid]:
                 self.routes[type_guid].update({server_guid:{'clients':[],
                                                             'info':{'port':server_port,
                                                                     'host':server_host},
@@ -243,7 +243,7 @@ class Router:
             s = self.routes[type_guid]['bind']
             self.unregister_port(s)
 
-            if self.leventobjs.has_key(s.fileno()) == True and self.leventobjs[s.fileno()] != None:
+            if s.fileno() in self.leventobjs and self.leventobjs[s.fileno()]:
                 self.leventobjs[s.fileno()].delete() # Kill libevent event
                 del self.leventobjs[s.fileno()]
 
@@ -262,7 +262,7 @@ class Router:
             pass
 
         if type_guid == None or server_guid == None and s != None and s != 0:
-            if self.leventobjs.has_key(s.fileno()) == True and self.leventobjs[s.fileno()] != None:
+            if s.fileno() in self.leventobjs and self.leventobjs[s.fileno()]:
                 self.leventobjs[s.fileno()].delete() # Kill libevent event
                 del self.leventobjs[s.fileno()]
             del self.sockets[s.fileno()] # Destroy the record
@@ -342,7 +342,7 @@ class Router:
         out = None
         for server,info in self.routes[type_guid].iteritems():
             if server == 'bind': continue
-            if info['info'].has_key('conn_max') == False:
+            if 'conn_max' not in info['info']:
                 info['info']['conn_max'] = 1000 # Change all of this later
             print("Info:", server, len(info['clients']), info['info']['conn_max'])
             if len(info['clients']) < info['info']['conn_max']:
@@ -389,7 +389,7 @@ class Router:
 
     def export_hostname(self,inpt):
         print(inpt)
-        if inpt.has_key('_socket_info'):
+        if '_socket_info' in inpt:
             return {'code':1,'hostname':inpt['_socket_info'][0]}
         else:
             return {'code':0,'msg':'Cannot detect your hostname!'}
@@ -418,7 +418,7 @@ class Router:
     def export_add(self, inpt):
         try:
             options = None
-            if inpt.has_key('conn_max'):
+            if 'conn_max' in inpt:
                 options = {'conn_max':inpt['conn_max']}
 
             if inpt['outside_port'] == globals()['XMLRPC_PORT']:

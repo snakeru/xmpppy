@@ -37,8 +37,8 @@ class Router(PlugIn):
             self.DEBUG('Presence: Could not set barejid, fromOutside=True','warn')
 
         if not typ or typ=='available' and fromOutside == False:
-            if not self._data.has_key(barejid): self._data[barejid]={}
-            if not self._data[barejid].has_key(resource): self._data[barejid][resource]=Presence(frm=jid,typ=typ)
+            if barejid not in self._data: self._data[barejid]={}
+            if resource not in self._data[barejid]: self._data[barejid][resource]=Presence(frm=jid,typ=typ)
             bp=self._data[barejid][resource]
 
             try: priority=int(stanza.getTagData('priority'))
@@ -71,8 +71,8 @@ class Router(PlugIn):
                     self._owner.Dispatcher.dispatch(p,session)
                     self.DEBUG('Finished for "%s"'%k,'info')
 
-            if not self._data.has_key(barejid) and raiseFlag == True: raise NodeProcessed
-            if self._data[barejid].has_key(resource): del self._data[barejid][resource]
+            if barejid not in self._data and raiseFlag: raise NodeProcessed
+            if resource in self._data[barejid]: del self._data[barejid][resource]
             self.update(barejid)
             if not self._data[barejid]: del self._data[barejid]
             self._owner.deactivatesession(session.peer)

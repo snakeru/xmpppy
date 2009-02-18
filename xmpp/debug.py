@@ -298,7 +298,7 @@ class Debug:
         if not active_flags:
             #no debuging at all
             self.active = []
-        elif type( active_flags ) in ( types.TupleType, types.ListType ):
+        elif type( active_flags ) in ( tuple,list ):
             flags = self._as_one_list( active_flags )
             for t in flags:
                 if t not in self.debug_flags:
