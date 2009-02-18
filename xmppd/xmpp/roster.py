@@ -70,7 +70,7 @@ class Roster(PlugIn):
                 if jid in self._data: del self._data[jid]
                 return
             self.DEBUG('Setting roster item %s...'%jid,'ok')
-            if jid not in self._data): self._data[jid]={}
+            if jid not in self._data: self._data[jid]={}
             self._data[jid]['name']=item.getAttr('name')
             self._data[jid]['ask']=item.getAttr('ask')
             self._data[jid]['subscription']=item.getAttr('subscription')

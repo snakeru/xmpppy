@@ -26,10 +26,10 @@ def XMLescape(txt):
 ENCODING='utf-8'
 def ustr(what):
     """Converts object "what" to unicode string using it's own __str__ method if accessible or unicode method otherwise."""
-    if type(what) == type(''): return what
+    if type(what) == str: return what
     try: r=what.__str__()
-    except AttributeError: r=str(what)
-    if type(r)!=type(''): return unicode(r,ENCODING)
+    except AttributeError: r=str(what,ENCODING)
+    if type(r)!=str: return str(r,ENCODING)
     return r
 
 class Node:
@@ -57,8 +57,8 @@ class Node:
             "node" and other arguments is provided then the node initially created as replica of "node"
             provided and then modified to be compliant with other arguments."""
         if node:
-            if self.FORCE_NODE_RECREATION and type(node)==type(self): node=str(node)
-            if type(node)!=type(self): node=NodeBuilder(node,self)
+            if self.FORCE_NODE_RECREATION and isinstance(node,Node): node=bytes(node)
+            if not isinstance(node,Node): node=NodeBuilder(node,self)
             else:
                 self.name,self.namespace,self.attrs,self.data,self.kids,self.parent = node.name,node.namespace,{},[],[],node.parent
                 for key  in node.attrs.keys(): self.attrs[key]=node.attrs[key]
@@ -71,9 +71,9 @@ class Node:
         if self.parent and not self.namespace: self.namespace=self.parent.namespace
         for attr in attrs.keys():
             self.attrs[attr]=attrs[attr]
-        if type(payload) in (type(''),type('')): payload=[payload]
+        if type(payload)==str: payload=[payload]
         for i in payload:
-            if type(i)==type(self): self.addChild(node=i)
+            if isinstance(i,Node): self.addChild(node=i)
             else: self.data.append(ustr(i))
 
     def __str__(self,fancy=0):
@@ -105,6 +105,9 @@ class Node:
             s = s + "</" + self.name + ">"
             if fancy: s = s + "\n"
         return s
+
+    def __bytes__(self): return self.__str__().encode('utf-8')
+
     def addChild(self, name=None, attrs={}, payload=[], namespace=None, node=None):
         """ If "node" argument is provided, adds it as child node. Else creates new node from
             the other arguments' values and adds it as well."""
@@ -127,7 +130,7 @@ class Node:
     def delChild(self, node, attrs={}):
         """ Deletes the "node" from the node's childs list, if "node" is an instance.
             Else deletes the first node that have specified name and (optionally) attributes. """
-        if type(node)!=type(self): node=self.getTag(node,attrs)
+        if not isinstance(node,Node): node=self.getTag(node,attrs)
         self.kids.remove(node)
         return node
     def getAttrs(self):

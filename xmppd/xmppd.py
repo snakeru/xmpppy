@@ -84,7 +84,7 @@ except:
 SERVER_MOTD = "Hello, I'm Help Desk. Type 'menu' for help."
 
 PORT_5222 = 5222
-PORT_5223 = 5223
+PORT_5223 = 52231
 PORT_5269 = 5269
 
 SOCKER_TGUID = 'BBTECH_XMPPD' # CHANGE THIS IF YOU ARE TO USE SOCKER!
@@ -278,7 +278,7 @@ class Session:
         if self.TYP=='server': self.ID=str(random.random())[2:]
         else: self.ID=None
 
-        self.sendbuffer=''
+        self.sendbuffer=b''
         self.lib_event = None
         self._stream_pos_queued=None
         self._stream_pos_sent=0
@@ -311,10 +311,10 @@ class Session:
     def receive(self):
         """Reads all pending incoming data. Raises IOError on disconnect."""
         try: received = self._recv(10240)
-        except: received = ''
+        except: received = b''
 
         if len(received): # length of 0 means disconnect
-            self.DEBUG(repr(self._sock.fileno())+' '+received,'got')
+            self.DEBUG(repr(self._sock.fileno())+' '+repr(received),'got')
             self.last_seen = time.time()
         else:
             self.DEBUG(self._owner._l(SESSION_RECEIVE_ERROR),'error')
@@ -336,7 +336,10 @@ class Session:
         self._owner.num_messages += 1
         if isinstance(stanza,Protocol):
             self.stanza_queue.append(stanza)
-        else: self.sendbuffer+=stanza
+        else:
+#            import pdb;pdb.set_trace()
+            if type(stanza)!=bytes: stanza=bytes(stanza)
+            self.sendbuffer+=stanza
         if self._socket_state>=SOCKET_ALIVE: self.push_queue()
 
     def push_queue(self,failreason=ERR_RECIPIENT_UNAVAILABLE):
@@ -371,7 +374,7 @@ class Session:
                 self.set_socket_state(SOCKET_DEAD)
                 self.DEBUG(self._owner._l(SESSION_SEND_ERROR),'error')
                 return self.terminate_stream()
-            self.DEBUG(repr(self._sock.fileno())+' '+self.sendbuffer[:sent],'sent')
+            self.DEBUG(repr(self._sock.fileno())+' '+repr(self.sendbuffer[:sent]),'sent')
             self._stream_pos_sent+=sent
             self.sendbuffer=self.sendbuffer[sent:]
             self._stream_pos_delivered=self._stream_pos_sent            # Should be acquired from socket somehow. Take SSL into account.
@@ -862,7 +865,7 @@ class Server:
                     data=sess.receive()
                 except IOError: # client closed the connection
                     sess.terminate_stream()
-                    data=''
+                    data=b''
                 if data:
                     try:
                         sess.Parse(data)
@@ -1026,7 +1029,7 @@ class get_input(threading.Thread):
     def run(self):
         global GLOBAL_TERMINATE
         while GLOBAL_TERMINATE == False:
-            the_input = raw_input("")
+            the_input = sys.stdin.readline().strip()
             if the_input == 'restart':
                 self._owner.DEBUG('server','Stand-by; Restarting entire server!','info')
                 self._owner.shutdown(STREAM_SYSTEM_SHUTDOWN)
@@ -1113,21 +1116,22 @@ class get_input(threading.Thread):
                 break
             time.sleep(.01)
 
-
+cmd_options.enable_debug=True
 if __name__=='__main__':
     if 'event' in globals().keys(): event.init()
     debug_mode = None
     debug_file = sys.stdout
-    if globals()['cmd_options'].enable_debug == True:
+    if globals()['cmd_options'].enable_debug:
         debug_mode = ['always']
     else:
         debug_file = open('xmppd.log','w+')
     s=Server(debug_mode,False,debug_file)
+#    import pdb;pdb.set_trace()
     inpt_service = get_input(s)
     inpt_service.setDaemon(True)
 
     GLOBAL_TERMINATE = False
-    if cmd_options.enable_interactive == True: inpt_service.start()
+    if cmd_options.enable_interactive: inpt_service.start()
     while GLOBAL_TERMINATE == False:
         try:
             s.run()
@@ -1136,13 +1140,13 @@ if __name__=='__main__':
         except KeyboardInterrupt:
             s.DEBUG('server',s._l(SERVER_SHUTDOWN_MSG),'info')
             s.shutdown(STREAM_SYSTEM_SHUTDOWN)
-        except:
-            if 'event' in globals().keys(): event.abort()
-            if globals()['cmd_options'].enable_debug == True:
-                print('Check your traceback file, please!')
-            tbfd = file('xmppd.traceback','a')
-            tbfd.write(str('\nTRACEBACK REPORT FOR XMPPD for %s\n' + '='*55 + '\n')%time.strftime('%c'))
-            #write traceback
-            traceback.print_exc(None,tbfd)
-            tbfd.close()
-        if cmd_options.disable_fallback == True: GLOBAL_TERMINATE = True
+#        except:
+#            if 'event' in globals().keys(): event.abort()
+#            if cmd_options.enable_debug:
+#                print('Check your traceback file, please!')
+#            tbfd = open('xmppd.traceback','a')
+#            tbfd.write(str('\nTRACEBACK REPORT FOR XMPPD for %s\n' + '='*55 + '\n')%time.strftime('%c'))
+#            #write traceback
+#            traceback.print_exc(None,tbfd)
+#            tbfd.close()
+        if cmd_options.disable_fallback: GLOBAL_TERMINATE = True
