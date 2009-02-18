@@ -343,7 +343,7 @@ class Debug:
         
         This code organises lst and remves dupes
         """
-        if type( items ) <> type( [] ) and type( items ) <> type( () ):
+        if type( items ) != type( [] ) and type( items ) != type( () ):
             return [ items ]
         r = []
         for l in items:
@@ -360,7 +360,7 @@ class Debug:
     
     def _append_unique_str( self, lst, item ):
         """filter out any dupes."""
-        if type(item) <> type(''):
+        if type(item) != type(''):
             msg2 = '%s' % item
             raise 'Invalid item type (should be string)',msg2
         if item not in lst:
@@ -390,9 +390,9 @@ class Debug:
     colors={}
     def Show(self, flag, msg, prefix=''):
         msg=msg.replace('\r','\\r').replace('\n','\\n')
-        if self.colors.has_key(prefix): msg=self.colors[prefix]+msg+color_none
+        if prefix in self.colors: msg=self.colors[prefix]+msg+color_none
         else: msg=color_none+msg
-        if self.colors.has_key(flag): prefixcolor=self.colors[flag]
+        if flag in self.colors: prefixcolor=self.colors[flag]
         else: prefixcolor=color_none
         
         prefix= self.prefix+prefixcolor+(flag+' '*12)[:12]+' '+(prefix+' '*6)[:6]

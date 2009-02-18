@@ -60,16 +60,16 @@ class PlugIn:
         if self.DBG_LINE not in owner.debug_flags:
             owner.debug_flags.append(self.DBG_LINE)
         self.DEBUG('Plugging %s into %s'%(self,self._owner),'start')
-        if owner.__dict__.has_key(self.__class__.__name__):
+        if self.__class__.__name__ in owner.__dict__:
             return self.DEBUG('Plugging ignored: another instance already plugged.','error')
         self._old_owners_methods=[]
         for method in self._exported_methods:
-            if owner.__dict__.has_key(method.__name__):
+            if method.__name__ in owner.__dict__:
                 self._old_owners_methods.append(owner.__dict__[method.__name__])
             owner.__dict__[method.__name__]=method
         owner.__dict__[self.__class__.__name__]=self
-        if self.__class__.__dict__.has_key('plugin'): return self.plugin(owner)
- 
+        if 'plugin' in self.__class__.__dict__: return self.plugin(owner)
+
     def PlugOut(self):
         """ Unregister all our staff from main instance and detach from it. """
         self.DEBUG('Plugging %s out of %s.'%(self,self._owner),'stop')
@@ -77,7 +77,7 @@ class PlugIn:
         for method in self._exported_methods: del self._owner.__dict__[method.__name__]
         for method in self._old_owners_methods: self._owner.__dict__[method.__name__]=method
         del self._owner.__dict__[self.__class__.__name__]
-        if self.__class__.__dict__.has_key('plugout'): return self.plugout()
+        if 'plugout' in self.__class__.__dict__: return self.plugout()
 
     def DEBUG(self,text,severity='info'):
         """ Feed a provided debug line to main instance's debug facility along with our ID string. """
@@ -98,7 +98,7 @@ class CommonClient:
         self.disconnect_handlers=[]
         self.Server=server
         self.Port=port
-        if debug and type(debug)<>list: debug=['always', 'nodebuilder']
+        if debug and type(debug)!=list: debug=['always', 'nodebuilder']
         self._DEBUG=Debug.Debug(debug)
         self.DEBUG=self._DEBUG.Show
         self.debug_flags=self._DEBUG.debug_flags
@@ -123,7 +123,7 @@ class CommonClient:
         self.disconnect_handlers.reverse()
         for i in self.disconnect_handlers: i()
         self.disconnect_handlers.reverse()
-        if self.__dict__.has_key('TLS'): self.TLS.PlugOut()
+        if 'TLS' in self.__dict__: self.TLS.PlugOut()
 
     def DisconnectHandler(self):
         """ Default disconnect handler. Just raises an IOError.
@@ -161,7 +161,7 @@ class CommonClient:
             self.connected='tls'
         dispatcher.Dispatcher().PlugIn(self)
         while self.Dispatcher.Stream._document_attrs is None: self.Process(1)
-        if self.Dispatcher.Stream._document_attrs.has_key('version') and self.Dispatcher.Stream._document_attrs['version']=='1.0':
+        if 'version' in self.Dispatcher.Stream._document_attrs and self.Dispatcher.Stream._document_attrs['version']=='1.0':
             while not self.Dispatcher.Stream.features and self.Process(): pass      # If we get version 1.0 stream the features tag MUST BE presented
         return self.connected
 
@@ -174,11 +174,11 @@ class Client(CommonClient):
             Example: connect(('192.168.5.5':5222),{'host':'proxy.my.net','port':8080,'user':'me','password':'secret'})"""
         if not CommonClient.connect(self,server,proxy) or not tls: return self.connected
         transports.TLS().PlugIn(self)
-        if not self.Dispatcher.Stream._document_attrs.has_key('version') or not self.Dispatcher.Stream._document_attrs['version']=='1.0': return self.connected
+        if 'version' not in self.Dispatcher.Stream._document_attrs or not self.Dispatcher.Stream._document_attrs['version']=='1.0': return self.connected
         while not self.Dispatcher.Stream.features and self.Process(): pass      # If we get version 1.0 stream the features tag MUST BE presented
         if not self.Dispatcher.Stream.features.getTag('starttls'): return self.connected       # TLS not supported by server
         while not self.TLS.starttls and self.Process(): pass
-        if self.TLS.starttls<>'success': self.event('tls_failed'); return self.connected
+        if self.TLS.starttls!='success': self.event('tls_failed'); return self.connected
         self.connected='tls'
         return self.connected
 
@@ -187,7 +187,7 @@ class Client(CommonClient):
             random one or library name used. """
         self._User,self._Password,self._Resource=user,password,resource
         while not self.Dispatcher.Stream._document_attrs and self.Process(): pass
-        if self.Dispatcher.Stream._document_attrs.has_key('version') and self.Dispatcher.Stream._document_attrs['version']=='1.0':
+        if 'version' in self.Dispatcher.Stream._document_attrs and self.Dispatcher.Stream._document_attrs['version']=='1.0':
             while not self.Dispatcher.Stream.features and self.Process(): pass      # If we get version 1.0 stream the features tag MUST BE presented
         auth.SASL().PlugIn(self)
         if self.SASL.startsasl=='not-supported':
@@ -208,7 +208,7 @@ class Client(CommonClient):
     def getRoster(self):
         """ Return the Roster instance, previously plugging it in and
             requesting roster from server if needed. """
-        if not self.__dict__.has_key('Roster'): roster.Roster().PlugIn(self)
+        if 'Roster' not in self.__dict__: roster.Roster().PlugIn(self)
         return self.Roster.getRoster()
 
     def sendInitPresence(self,requestRoster=1):

@@ -7,7 +7,7 @@
 from xmpp import *
 from xmppd import *
 import socket,thread
-from tlslite.api import *
+#from tlslite.api import *
 
 class TLS(PlugIn):
     """ 3.                        <features/>
@@ -77,7 +77,7 @@ class TLS(PlugIn):
         session._owner.registersession(session)
 
     def proceedfailureHandler(self,session,stanza):
-        if stanza.getName()<>'proceed':
+        if stanza.getName()!='proceed':
             self.DEBUG('TLS can not be started. Giving up.','error')
             session.unfeature(NS_TLS)
             raise NodeProcessed
@@ -108,10 +108,14 @@ class TLS(PlugIn):
             session.send(Node('starttls',{'xmlns':NS_TLS}))
         raise NodeProcessed
 
-import sha,base64,random,md5
+import hashlib,base64,random
 
-def HH(some): return md5.new(some).hexdigest()
-def H(some): return md5.new(some).digest()
+def HH(some):
+    if type(some)==string: some=bytes(some,'utf-8')
+    return hashlib.md5(some).hexdigest()
+def H(some):
+    if type(some)==string: some=bytes(some,'utf-8')
+    return str(hashlib.md5(some).digest(),'utf-8')
 def C(some): return ':'.join(some)
 
 class SASL(PlugIn):
@@ -230,7 +234,7 @@ class SASL(PlugIn):
                 if session.sasl.has_key('otherdata'): pack=session.sasl['otherdata'].split('\000')
                 else: pack=[]
                 authzid=session.peer
-                if len(pack)<>3: res=0
+                if len(pack)!=3: res=0
                 else:
                     authzid, authcid, passwd = pack
                     if not authzid:
@@ -295,7 +299,7 @@ class Bind(PlugIn):
         server.Dispatcher.RegisterHandler('iq',self.bindHandler,typ='set',ns=NS_BIND,xmlns=NS_CLIENT)
 
     def bindHandler(self,session,stanza):
-        if session.xmlns<>NS_CLIENT or session.__dict__.has_key('resource'):
+        if session.xmlns!=NS_CLIENT or session.__dict__.has_key('resource'):
             session.send(Error(stanza,ERR_SERVICE_UNAVAILABLE))
         else:
             if session._session_state<SESSION_AUTHED:
@@ -323,7 +327,7 @@ class Session(PlugIn):
         if session._session_state<SESSION_AUTHED:
             session.terminate_stream(STREAM_NOT_AUTHORIZED)
             raise NodeProcessed
-        if session.xmlns<>NS_CLIENT \
+        if session.xmlns!=NS_CLIENT \
           or session._session_state<SESSION_BOUND \
           or self._owner.getsession(session.peer)==session:
             session.send(Error(stanza,ERR_SERVICE_UNAVAILABLE))
