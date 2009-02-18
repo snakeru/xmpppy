@@ -1,4 +1,4 @@
-# -*- coding: UTF-8 -*- 
+# -*- coding: UTF-8 -*-
 # Distributed under the terms of GPL version 2 or any later
 # Copyright (C) Alexey Nezhdanov 2004
 # Copyright (C) Kristopher Tate / BlueBridge Technologies Group 2005
@@ -168,22 +168,22 @@ class Router(PlugIn):
         to=stanza['to']
         if stanza.getNamespace()==NS_SERVER:
             if not frm or not to \
-              or frm.getDomain()<>session.peer \
-              or to.getDomain()<>session.ourname:
+              or frm.getDomain()!=session.peer \
+              or to.getDomain()!=session.ourname:
                 session.terminate_stream(STREAM_IMPROPER_ADDRESSING)
                 raise NodeProcessed
         else:
-            if frm and frm<>session.peer:   # if the from address specified and differs
+            if frm and frm!=session.peer:   # if the from address specified and differs
                 if frm.getResource() or not frm.bareMatch(session.peer): # ...it can differ only while comparing inequally
                     session.terminate_stream(STREAM_INVALID_FROM)
                     raise NodeProcessed
 
             if session._session_state<SESSION_BOUND: # NOT BOUND yet (bind stuff already done)
-                if stanza.getType()<>'error': session.send(Error(stanza,ERR_NOT_AUTHORIZED))
+                if stanza.getType()!='error': session.send(Error(stanza,ERR_NOT_AUTHORIZED))
                 raise NodeProcessed
 
             if name=='presence' and session._session_state<SESSION_OPENED:
-                if stanza.getType()<>'error': session.send(Error(stanza,ERR_NOT_ALLOWED))
+                if stanza.getType()!='error': session.send(Error(stanza,ERR_NOT_ALLOWED))
                 raise NodeProcessed
             stanza.setFrom(session.peer)
     
@@ -509,15 +509,15 @@ class Router(PlugIn):
 #    sender if it is a message stanza.
             if not self._owner.AUTH.isuser(node,domain):
                 if name in ['iq','message']:
-                    if stanza.getType()<>'error': session.enqueue(Error(stanza,ERR_SERVICE_UNAVAILABLE))
+                    if stanza.getType()!='error': session.enqueue(Error(stanza,ERR_SERVICE_UNAVAILABLE))
                 if raiseFlag: raise NodeProcessed
 # 3. Else if the JID is of the form <user@domain/resource> and no available resource matches the full JID, 
 #    the recipient's server (a) SHOULD silently ignore the stanza (i.e., neither deliver it nor return an 
 #    error) if it is a presence stanza, (b) MUST return a <service-unavailable/> stanza error to the sender 
 #    if it is an IQ stanza, and (c) SHOULD treat the stanza as if it were addressed to <user@domain> if it 
 #    is a message stanza.
-            if resource and name<>'message':
-                if name=='iq' and stanza.getType()<>'error': session.enqueue(Error(stanza,ERR_SERVICE_UNAVAILABLE))
+            if resource and name!='message':
+                if name=='iq' and stanza.getType()!='error': session.enqueue(Error(stanza,ERR_SERVICE_UNAVAILABLE))
                 if raiseFlag: raise NodeProcessed
 # 4. Else if the JID is of the form <user@domain> and there is at least one available resource available 
 #    for the user, the recipient's server MUST follow these rules:
@@ -591,7 +591,7 @@ class Router(PlugIn):
                     if stanza.getType() == 'probe' and stanza['to'].getDomain() in self._owner.servernames: 
                         stanza.setAttr('internal','True')
                         self.presenceHandler(session,stanza,raiseFlag)
-                                            
+
                     if stanza.getType() in ["subscribe", "subscribed", "unsubscribe", "unsubscribed"]:
                         session,stanza = self.balance_of_presence(session,stanza)
                     #elif stanza.getType() == 'probe': # differ to Presence Handler!
@@ -607,7 +607,7 @@ class Router(PlugIn):
 #          matter of implementation and service provisioning.)
                 elif name=='message':
                     #self._owner.DB.store(domain,node,stanza)
-                    if stanza.getType()<>'error': session.enqueue(Error(stanza,ERR_RECIPIENT_UNAVAILABLE))
+                    if stanza.getType()!='error': session.enqueue(Error(stanza,ERR_RECIPIENT_UNAVAILABLE))
                     if raiseFlag: raise NodeProcessed
 #       4. For IQ stanzas, the server itself MUST reply on behalf of the user with either an IQ result or 
 #          an IQ error. Specifically, if the semantics of the qualifying namespace define a reply that the 
@@ -618,6 +618,6 @@ class Router(PlugIn):
             s=getsession(domain)
             if not s:
                 s=self._owner.S2S(session.ourname,domain)
-                
+
             s.enqueue(stanza)
             if raiseFlag: raise NodeProcessed

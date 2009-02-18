@@ -99,7 +99,7 @@ class Dispatcher(PlugIn):
         self._owner.send("<?xml version='1.0'?>%s>"%str(self._metastream)[:-2])
 
     def _check_stream_start(self,ns,tag,attrs):
-        if ns<>NS_STREAMS or tag<>'stream':
+        if ns!=NS_STREAMS or tag!='stream':
             raise ValueError('Incorrect stream start: (%s,%s). Terminating.'%(tag,ns))
 
     def Process(self, timeout=0):
@@ -161,9 +161,9 @@ class Dispatcher(PlugIn):
         if not xmlns: xmlns=self._owner.defaultNamespace
         self.DEBUG('Registering handler %s for "%s" type->%s ns->%s(%s)'%(handler,name,typ,ns,xmlns), 'info')
         if not typ and not ns: typ='default'
-        if not self.handlers.has_key(xmlns): self.RegisterNamespace(xmlns,'warn')
-        if not self.handlers[xmlns].has_key(name): self.RegisterProtocol(name,Protocol,xmlns,'warn')
-        if not self.handlers[xmlns][name].has_key(typ+ns): self.handlers[xmlns][name][typ+ns]=[]
+        if not xmlns in self.handlers: self.RegisterNamespace(xmlns,'warn')
+        if not name in self.handlers[xmlns]: self.RegisterProtocol(name,Protocol,xmlns,'warn')
+        if not typ+ns in self.handlers[xmlns][name]: self.handlers[xmlns][name][typ+ns]=[]
         if makefirst: self.handlers[xmlns][name][typ+ns].insert({'func':handler,'system':system})
         else: self.handlers[xmlns][name][typ+ns].append({'func':handler,'system':system})
 
@@ -231,10 +231,10 @@ class Dispatcher(PlugIn):
         if name=='features': session.Stream.features=stanza
 
         xmlns=stanza.getNamespace()
-        if not self.handlers.has_key(xmlns):
+        if xmlns not in self.handlers:
             self.DEBUG("Unknown namespace: " + xmlns,'warn')
             xmlns='unknown'
-        if not self.handlers[xmlns].has_key(name):
+        if name not in self.handlers[xmlns]:
             self.DEBUG("Unknown stanza: " + name,'warn')
             name='unknown'
         else:
@@ -250,24 +250,24 @@ class Dispatcher(PlugIn):
         session.DEBUG("Dispatching %s stanza with type->%s props->%s id->%s"%(name,typ,stanza.props,ID),'ok')
 
         list=['default']                                                     # we will use all handlers:
-        if self.handlers[xmlns][name].has_key(typ): list.append(typ)                # from very common...
+        if typ in self.handlers[xmlns][name]: list.append(typ)               # from very common...
         for prop in stanza.props:
-            if self.handlers[xmlns][name].has_key(prop): list.append(prop)
-            if typ and self.handlers[xmlns][name].has_key(typ+prop): list.append(typ+prop)  # ...to very particular
+            if prop in self.handlers[xmlns][name]: list.append(prop)
+            if typ and typ+prop in self.handlers[xmlns][name]: list.append(typ+prop)  # ...to very particular
 
         chain=self.handlers[xmlns]['default']['default']
         for key in list:
             if key: chain = chain + self.handlers[xmlns][name][key]
 
         output=''
-        if session._expected.has_key(ID):
+        if ID in session._expected:
             user=0
             if type(session._expected[ID])==type(()):
                 cb,args=session._expected[ID]
                 session.DEBUG("Expected stanza arrived. Callback %s(%s) found!"%(cb,args),'ok')
                 try: cb(session,stanza,**args)
                 except Exception, typ:
-                    if typ.__class__.__name__<>'NodeProcessed': raise
+                    if typ.__class__.__name__!='NodeProcessed': raise
             else:
                 session.DEBUG("Expected stanza arrived!",'ok')
                 session._expected[ID]=stanza
@@ -277,7 +277,7 @@ class Dispatcher(PlugIn):
                 try:
                     handler['func'](session,stanza)
                 except Exception, typ:
-                    if typ.__class__.__name__<>'NodeProcessed': raise
+                    if typ.__class__.__name__!='NodeProcessed': raise
                     user=0
         if user and self._defaultHandler: self._defaultHandler(session,stanza)
 
@@ -322,7 +322,7 @@ class Dispatcher(PlugIn):
         elif not stanza.getID():
             global ID
             ID+=1
-            _ID=`ID`
+            _ID=str(ID)
             stanza.setID(_ID)
         else: _ID=stanza.getID()
         if self._owner._registered_name and not stanza.getAttr('from'): stanza.setAttr('from',self._owner._registered_name)
