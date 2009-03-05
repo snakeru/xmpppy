@@ -910,14 +910,16 @@ class Transport:
 
     def y_ping(self, yobj):
         if config.dumpProtocol: print "got ping!"
-        freq = yobj.pripingfreq*60
-        nextrun = int(time.time()) + random.randrange(freq)
-        yobj.pripingobj=(freq,self.y_sendping,(yobj, yobj.ymsg_send_priping))
-        timerlist[yobj.pripingobj] = nextrun
-        freq = yobj.secpingfreq*60
-        nextrun = int(time.time()) + random.randrange(freq)
-        yobj.secpingobj=(freq,self.y_sendping,(yobj, yobj.ymsg_send_secping))
-        timerlist[yobj.secpingobj] = nextrun
+        if yobj.pripingfreq:
+            freq = yobj.pripingfreq*60
+            nextrun = int(time.time()) + random.randrange(freq)
+            yobj.pripingobj=(freq,self.y_sendping,(yobj, yobj.ymsg_send_priping))
+            timerlist[yobj.pripingobj] = nextrun
+        if yobj.secpingfreq:
+            freq = yobj.secpingfreq*60
+            nextrun = int(time.time()) + random.randrange(freq)
+            yobj.secpingobj=(freq,self.y_sendping,(yobj, yobj.ymsg_send_secping))
+            timerlist[yobj.secpingobj] = nextrun
         for each in yobj.xresources.keys():
             mjid = JID(yobj.fromjid)
             mjid.setResource(each)
