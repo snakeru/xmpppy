@@ -1355,6 +1355,7 @@ if __name__ == '__main__':
                     apply(each[1],each[2])
                 except:
                     logError()
+                    del timerlist[each]
     for each in [x for x in transport.userlist.keys()]:
         transport.userlist[each].connok = True
         transport.y_send_offline(each, status = transport.offlinemsg)
