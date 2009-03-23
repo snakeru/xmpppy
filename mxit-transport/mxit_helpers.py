@@ -42,8 +42,8 @@ def mxit_deargu(text, sepord=0):
 def mxit_mkargu(dict):
     # Turn dict into MXit Argument string.
     s=''
-    for each in dict.keys():
-        s=s+'\x00%s=%s' %(each,mxit_mklist(dict[each]))
+    for each in dict:
+        s=s+'\x00%s=%s' %(each[0],mxit_mklist(each[1]))
     return s
 
 def mxit_mklist(list,sepord=1):

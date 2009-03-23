@@ -2,6 +2,7 @@
 
 # MXit driver test script.
 from mxit_helpers import *
+from mxit.encryption import client_id, encode_password
 import socket, time, traceback
 import re
 import random
@@ -34,7 +35,7 @@ class MXitCon:
         self.username = username
         self.session = username
         self.password = password
-        self.clientkey = clientid[2:int(clientid[:2],16)+2]
+        self.clientid = clientid
         self.fromhost = fromhost
         self.fromjid = fromjid
         self.roster = {}
@@ -80,30 +81,11 @@ class MXitCon:
         else:
             return False
 
-    def mxit_parsebuddies(self,list):
-        #if self.dumpProtocol: print "Before: ",self.roster
-        for each in list:
-            if self.dumpProtocol: print 'buddy',repr(each)
-            if type(each) == type([]):
-                if len(each) == 5:
-                    [group, jid, nick, hidenumber, xport] = each
-                    if not self.buddylist.has_key(group):
-                        self.buddylist[group] = []
-                    self.buddylist[group].append((jid,nick))
-                    if not self.roster.has_key(jid):
-                        self.roster[jid]=('unavailable',None, None)
-                elif len(each) == 4:
-                    pass #invite
-        #if self.dumpProtocol: print "After: ", self.roster
-
     # decoding handlers
     def mxit_login(self,hdr,pay):
         # process login packet
         if self.dumpProtocol: print 'login',pay[1]
         if pay[1] == '0':
-            self.mxit_parsebuddies(pay[5:-1])
-            # need to process offline messages too (comes through as the last item)
-            #if self.dumpProtocol: print "got to login handler"
             if self.handlers.has_key('login'):
                 self.handlers['login'](self)
         elif len(pay[1]) > 1 and pay[1][0] == '16':
@@ -117,51 +99,42 @@ class MXitCon:
             if self.handlers.has_key('loginfail'):
                 self.handlers['loginfail'](self,pay[1][1])
 
-    def mxit_online(self,hdr,pay):
-        msgs = None
-        for each in pay[2:]:
-            if not msgs:
-                if not type(each) is type([]):
-                    msgs = [each.split('\x02')[1]]
-                    continue
-                if self.dumpProtocol: print 'online',repr(each)
-                if type(each) == type([]):
-                    if len(each) == 5:
-                        [group, jid, nick, status, xport] = each
-                        if status != '0':
-                            typ = None
-                            if status == '2':
-                                typ = 'away'
-                            elif status == '4':
-                                typ = 'dnd'
-                            elif status == '5':
-                                typ = 'xa'
-                            elif status == '7':
-                                typ = 'invisible'
-                            self.roster[jid]=('available', typ, nick)
-                            if self.handlers.has_key('online'):
-                                self.handlers['online'](self,jid)
-                        else:
-                            self.roster[jid]=('unavailable', None, None)
-                            if self.handlers.has_key('offline'):
-                                self.handlers['offline'](self,jid)
-            else:
-                if type(each) is type([]) or not '\x02' in each:
-                    msgs.append(each)
-                    continue
-                msgs.append(each.split('\x02')[0])
-                self.mxit_msg(hdr, msgs)
-                msgs = [each.split('\x02')[1]]
+    def mxit_logout(self,hdr,pay):
+        if self.dumpProtocol: print 'logout',pay[1]
+        if self.handlers.has_key('logout') and len(pay[1]) > 1:
+            self.handlers['logout'](self,pay[1][1])
 
-    def mxit_roster(self,hdr,pay):
-        if pay[0].has_key(3):
-            if pay[0].has_key(14):
-                msg = pay[0][14]
-            else:
-                msg = ''
-            if self.handlers.has_key('subscribe'):
-                self.handlers['subscribe'](self,pay[0][3],msg)
-        self.mxit_online(hdr,pay)
+    def mxit_online(self,hdr,pay):
+        for each in pay[2:-1]:
+            if self.dumpProtocol: print 'online',repr(each)
+            if type(each) == type([]):
+                if len(each) > 4:
+                    [group, jid, nick, status, network] = each[:5]
+                    if not self.buddylist.has_key(group):
+                        self.buddylist[group] = []
+                    self.buddylist[group].append((jid,nick))
+                    typ = None
+                    if status == '2':
+                        typ = 'away'
+                    elif status == '4':
+                        typ = 'dnd'
+                    elif status == '5':
+                        typ = 'xa'
+                    elif status == '7':
+                        typ = 'invisible'
+                    if status != '0':
+                        self.roster[jid]=('available', typ, nick)
+                        if self.handlers.has_key('online'):
+                            self.handlers['online'](self,jid)
+                    else:
+                        self.roster[jid]=('unavailable', typ, nick)
+                        if self.handlers.has_key('offline'):
+                            self.handlers['offline'](self,jid)
+
+    def mxit_status(self,hdr,pay):
+        if self.dumpProtocol: print 'status',pay[1]
+        if self.handlers.has_key('status'):
+            self.handlers['status'](self)
 
     def mxit_addbuddy(self,hdr,pay):
         pass
@@ -176,7 +149,7 @@ class MXitCon:
             self.handlers['message'](self, pay[2][0], msgs[0], ts)
 
     def mxit_send_login(self):
-        pay = mxit_mkargu({'ms':[self.password,'E-5.0.3-J-j2me',1,'',self.clientkey,'255','27'],'cr':'v5_6'})
+        pay = mxit_mkargu([['ms',[encode_password(self.clientid, self.password),'E-5.2.1-1.1',1,'',client_id(self.clientid),'255','27','en']],['cr','']])
         hdr = mxit_mkhdr(len(pay),M_login,0,self.session)
         pkt = hdr + pay
         return pkt
@@ -190,7 +163,7 @@ class MXitCon:
         #return hdr+pay
 
     def mxit_send_message(self, nick, msg, type=1):
-        pay = mxit_mkargu({'ms':[nick,msg,type]})
+        pay = mxit_mkargu([['ms',[nick,msg,type]]])
         hdr = mxit_mkhdr(len(pay), M_sendmsg,1,self.session)
         return hdr+pay
 
@@ -218,14 +191,14 @@ class MXitCon:
         elif show == 'invisible':
             d = '7'
         if self.dumpProtocol: print "send_online",d
-        pay = mxit_mkargu({'ms':d})
+        pay = mxit_mkargu([['ms',d]])
         hdr = mxit_mkhdr(len(pay),M_status,0,self.session)
         pkt = hdr + pay
         return pkt
 
     def mxit_send_offline(self):
         if self.dumpProtocol: print "send_offline"
-        pay = mxit_mkargu({'ms':'0'})
+        pay = mxit_mkargu([['ms','0']])
         hdr = mxit_mkhdr(len(pay),M_logout,0,self.session)
         pkt = hdr + pay
         return pkt
@@ -262,13 +235,12 @@ class MXitCon:
                 if s[3] == M_login:           #1
                     # login ok
                     self.mxit_login(s,t)
-                #elif s[3] == M_challenge:       #84
-                #    # login failed
-                #    self.mxit_recv_challenge(s,t)
+                elif s[3] == M_logout:          #2
+                    self.mxit_logout(s,t)
                 elif s[3] == M_online:          #3
                     self.mxit_online(s,t)
-                elif s[3] == M_roster:          #??
-                    self.mxit_roster(s,t)
+                elif s[3] == M_status:          #32
+                    self.mxit_status(s,t)
                 elif s[3] == M_recvmsg:         #9
                     self.mxit_msg(s,t)
                 #elif s[3] == M_sendmsg:         #10
@@ -284,7 +256,12 @@ class MXitCon:
                 break
 
 if __name__ == '__main__':
-    mxit = MXitCon('MXitID','password','2412345678-1234-1234-1234-123456788901','jid','',True)
+    file = open("account", "r")
+    username = file.readline().strip()
+    password = file.readline().strip()
+    clientid = file.readline().strip()
+    file.close()
+    mxit = MXitCon(username,password,clientid,'jid','',True)
     while not mxit.connect():
         print 'sleep'
         time.sleep(5)

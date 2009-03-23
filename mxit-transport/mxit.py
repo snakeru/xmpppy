@@ -30,11 +30,8 @@ NODE_ADMIN_REGISTERED_USERS='registered-users'
 NODE_ADMIN_ONLINE_USERS='online-users'
 NODE_ROSTER='roster'
 
-def MXitIDEncode(mxitid):
-    return mxitid.replace('@','%')
-
-def MXitIDDecode(mxitid):
-    return '@'.join(mxitid.rsplit('%',1))
+MXitIDEncode=JIDEncode
+MXitIDDecode=JIDDecode
 
 roomenccodere = re.compile('([^-]?)([A-Z-])')
 def RoomEncode(mxitid):
@@ -244,6 +241,7 @@ class Transport:
         con.handlers['login'] = self.mxit_login
         con.handlers['loginreconnect'] = self.mxit_loginreconnect
         con.handlers['loginfail'] = self.mxit_loginfail
+        con.handlers['logout'] = self.mxit_logout
         con.handlers['subscribe'] = self.mxit_subscribe
         con.handlers['message'] = self.mxit_message
         con.handlers['messagefail'] = self.mxit_messagefail
@@ -319,7 +317,9 @@ class Transport:
                             else:
                                 for each in self.userlist[fromstripped].buddylist.keys():
                                     for (mxitid,nick) in self.userlist[fromstripped].buddylist[each]:
-                                        self.jabberqueue(Presence(frm='%s@%s'%(MXitIDEncode(mxitid),config.jid),to = fromjid, typ='subscribe', status='MXit messenger contact'))
+                                        b = Presence(frm='%s@%s'%(MXitIDEncode(mxitid),config.jid),to = fromjid, typ='subscribe', status='MXit messenger contact')
+                                        b.addChild(node=Node(NODE_VCARDUPDATE,payload=[Node('nickname',payload=nick)]))
+                                        self.jabberqueue(b)
                             m = Presence(to = fromjid, frm = config.jid)
                             self.jabberqueue(m)
                             self.mxit_send_online(fromstripped)
@@ -783,6 +783,11 @@ class Transport:
             userfile[mxitobj.fromjid]=conf
             self.jabberqueue(Message(to=mxitobj.fromjid,frm=config.jid,subject='MXit login name',body='Your MXit username was specified incorrectly in the configuration. This may be because of an upgrade from a previous version, the configuration has been updated'))
 
+    def mxit_logout(self,mxitobj, reason = None):
+        if config.dumpProtocol: print "got logout: ",reason
+        self.jabberqueue(Message(to=mxitobj.event.getFrom(),frm=config.jid,subject='Logout',body=reason))
+        self.mxit_closed(mxitobj)
+
     def mxit_loginreconnect(self,mxitobj):
         if config.dumpProtocol: print "got login reconnect"
         if rdsocketlist.has_key(mxitobj.sock):
@@ -825,7 +830,9 @@ class Transport:
         for each in mxitobj.xresources.keys():
             mjid = JID(mxitobj.fromjid)
             mjid.setResource(each)
-            self.jabberqueue(Presence(to=mjid, frm = '%s@%s/mxit'%(MXitIDEncode(mxitid), config.jid),typ='unavailable'))
+            b = Presence(to=mjid, frm = '%s@%s/mxit'%(MXitIDEncode(mxitid), config.jid),typ='unavailable')
+            b.addChild(node=Node(NODE_VCARDUPDATE,payload=[Node('nickname',payload=mxitobj.roster[mxitid][2])]))
+            self.jabberqueue(b)
 
     def mxit_subscribe(self,mxitobj,mxitid,msg):
         self.jabberqueue(Presence(typ='subscribe',frm = '%s@%s' % (MXitIDEncode(mxitid), config.jid), to=mxitobj.fromjid,payload=msg))
