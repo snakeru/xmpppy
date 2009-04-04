@@ -1,8 +1,8 @@
 # Distributed under the terms of GPL version 2 or any later
+# Copyright (C) Kristopher Tate / BlueBridge Technologies Group 2005
 # Copyright (C) Alexey Nezhdanov 2004
-# Stream-level features for xmppd.py
 
-# $Id: stream.py,v 1.7 2004-10-27 18:34:05 snakeru Exp $
+# Stream-level features for xmppd.py
 
 from xmpp import *
 from xmppd import *
@@ -24,7 +24,7 @@ class TLS(PlugIn):
 
     def starttlsHandler(self,session,stanza):
         if 'tls' in session.features:
-            session.sendnow(Node('failure',{'xmlns':NS_TLS}))
+            session.send(Node('failure',{'xmlns':NS_TLS}))
             self.DEBUG('TLS startup failure: already started.','error')
             session.unfeature(NS_TLS)
             raise NodeProcessed
@@ -35,18 +35,18 @@ class TLS(PlugIn):
         try: open(certfile) ; open(keyfile)
         except: certfile=None
         if not certfile or not keyfile:
-            session.sendnow(Node('failure',{'xmlns':NS_TLS}))
+            session.send(Node('failure',{'xmlns':NS_TLS}))
             self.DEBUG('TLS startup failure: can\'t find SSL cert/key file[s].','error')
             session.unfeature(NS_TLS)    # do not declare TLS anymore
             session.stop_feature(NS_TLS) # TLS finished, let another features start
         else:
-            session.sendnow(Node('proceed',{'xmlns':NS_TLS}))
+            session.send(Node('proceed',{'xmlns':NS_TLS}))
             self.startservertls(session)
         raise NodeProcessed
 
     def startservertls(self,session):
         session._owner.unregistersession(session)
-        thread.start_new_thread(self._startservertls,(session,))
+        self._startservertls(session)
 
     def _startservertls(self,session):
         try:
@@ -100,11 +100,12 @@ class TLS(PlugIn):
         if NS_TLS in session.features: return     # already started. do nothing
         if session.feature_in_process: return     # some other feature is already underway
         if not stanza.getTag('starttls',namespace=NS_TLS):
-            self.DEBUG("TLS unsupported by remote server.",'warn')
+            self.DEBUG("TLS unsupported by remote server; Doing nothing -- Prob. jabber.org?",'warn')
+            return
         else:
             self.DEBUG("TLS supported by remote server. Requesting TLS start.",'ok')
             session.start_feature(NS_TLS)
-            session.sendnow(Node('starttls',{'xmlns':NS_TLS}))
+            session.send(Node('starttls',{'xmlns':NS_TLS}))
         raise NodeProcessed
 
 import sha,base64,random,md5
@@ -162,11 +163,11 @@ class SASL(PlugIn):
             self.DEBUG('I can only use DIGEST-MD5 and PLAIN mecanisms.','error')
             return
         session.startsasl='in-process'
-        session.sendnow(node)
+        session.send(node)
         raise NodeProcessed
 """
     def commit_auth(self,session,authzid):
-        session.sendnow(Node('success',{'xmlns':NS_SASL}))
+        session.send(Node('success',{'xmlns':NS_SASL}))
         session.feature(NS_SASL)
         session.unfeature(NS_TLS)
         session.sasl['next']=[]
@@ -177,7 +178,7 @@ class SASL(PlugIn):
         self.DEBUG('Peer %s successfully authenticated'%authzid,'ok')
 
     def reject_auth(self,session,authzid='unknown'):
-        session.sendnow(Node('failure',{'xmlns':NS_SASL},[Node('not-authorized')]))
+        session.send(Node('failure',{'xmlns':NS_SASL},[Node('not-authorized')]))
         session.sasl['retries']=session.sasl['retries']-1
         if session.sasl['retries']<=0: session.terminate_stream()
         self.DEBUG('Peer %s failed to authenticate'%authzid,'error')
@@ -268,8 +269,8 @@ class SASL(PlugIn):
                     if key in ['nc','qop','response','charset']: sasl_data+="%s=%s,"%(key,resp[key])
                     else: sasl_data+='%s="%s",'%(key,resp[key])
                 node=Node('response',attrs={'xmlns':NS_SASL},payload=[base64.encodestring(sasl_data[:-1]).replace('\n','')])
-                self._owner.sendnow(node)
-            elif chal.has_key('rspauth'): self._owner.sendnow(Node('response',attrs={'xmlns':NS_SASL}))
+                self._owner.send(node)
+            elif chal.has_key('rspauth'): self._owner.send(Node('response',attrs={'xmlns':NS_SASL}))
 """
         elif stanza.getName()=='response':
             session.sasl['next']=['response','abort']
@@ -291,11 +292,11 @@ class SASL(PlugIn):
 class Bind(PlugIn):
     NS=NS_BIND
     def plugin(self,server):
-        server.Dispatcher.RegisterHandler('iq',self.bindHandler,typ='set',ns=NS_BIND)
+        server.Dispatcher.RegisterHandler('iq',self.bindHandler,typ='set',ns=NS_BIND,xmlns=NS_CLIENT)
 
     def bindHandler(self,session,stanza):
         if session.xmlns<>NS_CLIENT or session.__dict__.has_key('resource'):
-            session.sendnow(Error(stanza,ERR_SERVICE_UNAVAILABLE))
+            session.send(Error(stanza,ERR_SERVICE_UNAVAILABLE))
         else:
             if session._session_state<SESSION_AUTHED:
                 session.terminate_stream(STREAM_NOT_AUTHORIZED)
@@ -309,14 +310,14 @@ class Bind(PlugIn):
             rep=stanza.buildReply('result')
             rep.T.bind.setNamespace(NS_BIND)
             rep.T.bind.T.jid=fulljid
-            session.sendnow(rep)
+            session.send(rep)
             session.set_session_state(SESSION_BOUND)
         raise NodeProcessed
 
 class Session(PlugIn):
     NS=NS_SESSION
     def plugin(self,server):
-        server.Dispatcher.RegisterHandler('iq',self.sessionHandler,typ='set',ns=NS_SESSION)
+        server.Dispatcher.RegisterHandler('iq',self.sessionHandler,typ='set',ns=NS_SESSION,xmlns=NS_CLIENT)
 
     def sessionHandler(self,session,stanza):
         if session._session_state<SESSION_AUTHED:
@@ -325,8 +326,8 @@ class Session(PlugIn):
         if session.xmlns<>NS_CLIENT \
           or session._session_state<SESSION_BOUND \
           or self._owner.getsession(session.peer)==session:
-            session.sendnow(Error(stanza,ERR_SERVICE_UNAVAILABLE))
+            session.send(Error(stanza,ERR_SERVICE_UNAVAILABLE))
         else:
             session.set_session_state(SESSION_OPENED)
-            session.sendnow(stanza.buildReply('result'))
+            session.send(stanza.buildReply('result'))
         raise NodeProcessed

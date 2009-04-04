@@ -2,7 +2,7 @@
 # Copyright (C) Alexey Nezhdanov 2004
 # Dialback module for xmppd.py
 
-# $Id: dialback.py,v 1.3 2004-10-27 18:34:05 snakeru Exp $
+# $Id: dialback.py,v 1.2 2004/10/24 04:37:19 snakeru Exp $
 
 from xmpp import *
 from xmppd import *
@@ -41,7 +41,7 @@ class Dialback(PlugIn):
             s=self._owner.getsession(frm)
             if not s:
                 s=self._owner.S2S(session.ourname,frm.getDomain(),slave_session=session)
-            s.sendnow(req)
+            s.send(req)
             if self.waitlist.has_key(frm):
                 self.waitlist[frm][1].terminate_stream(STREAM_CONFLICT)
             self.waitlist[frm]=(key,session)
@@ -53,7 +53,7 @@ class Dialback(PlugIn):
             if key.strip()==sha.new(id+self._owner.ID).hexdigest(): typ='valid'
             else: typ='invalid'
             rep=Node('db:verify',{'from':to,'to':frm,'id':id,'type':typ})
-            session.sendnow(rep)
+            session.send(rep)
         elif name=='verify' and session.TYP=='client':
             # (9) Received the verification reply
             self.DEBUG('Received verified dialback key for id %s (%s->%s). Result is: %s.'%(stanza['id'],frm,to,stanza['type']),'info')
@@ -61,7 +61,7 @@ class Dialback(PlugIn):
                 key,s=self.waitlist[frm]
                 if s.ID==stanza['id']:
                     rep=Node('db:result',{'from':to,'to':frm,'type':stanza['type']})
-                    s.sendnow(rep)
+                    s.send(rep)
                     if stanza['type']<>'valid': s.terminate_stream(STREAM_NOT_AUTHORIZED)
                     else:
                         s.peer=frm
@@ -79,7 +79,7 @@ class Dialback(PlugIn):
         # Server connected, send request
         key=sha.new(session.ID+self._owner.ID).hexdigest()
         req=Node('db:result',{'from':session.ourname,'to':session.peer},[key])
-        session.sendnow(req)
+        session.send(req)
 
     def FeaturesHandler(self,session,stanza):
         if session._session_state>=SESSION_AUTHED: return     # already authed. do nothing
