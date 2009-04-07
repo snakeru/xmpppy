@@ -258,23 +258,23 @@ class YahooCon:
         typ = None
         if msg.has_key(10):
             if msg[10] == '1':
-                status = "Be Right Back"
+                typ, status = "away", "Be Right Back"
             elif msg[10] == '2':
-                status = "Busy"
+                typ, status = "dnd", "Busy"
             elif msg[10] == '3':
-                status = "Not at Home"
+                typ, status = "xa", "Not at Home"
             elif msg[10] == '4':
-                status = "Not at my Desk"
+                typ, status = "away", "Not at my Desk"
             elif msg[10] == '5':
-                status = "Not in the office"
+                typ, status = "xa", "Not in the office"
             elif msg[10] == '6':
-                status = "On the phone"
+                typ, status = "dnd", "On the phone"
             elif msg[10] == '7':
-                status = "On Vacation"
+                typ, status = "away", "On Vacation"
             elif msg[10] == '8':
-                status = "Out to lunch"
+                typ, status = "away", "Out to lunch"
             elif msg[10] == '9':
-                status = "Stepped Out"
+                typ, status = "away", "Stepped Out"
             elif msg[10] == '99':
                 if msg.has_key(19):
                     status = re.sub('\x05','',unicode(msg[19],'utf-8','replace'))
