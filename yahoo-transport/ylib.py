@@ -18,6 +18,7 @@ def printpacket(packet):
 # Yahoo Functions
 class YahooCon:
     rbuf = ''
+    roster_tmp = ''
     pripingtime = 0
     secpingtime = 0
     confpingtime = 0
@@ -118,7 +119,10 @@ class YahooCon:
     def ymsg_login(self,hdr,pay):
         # process login packet
         if pay[0].has_key(87):
-            self.y_parsebuddies(pay[0][87])
+            self.roster_tmp += pay[0][87]
+        if self.roster_tmp and ( hdr[4] == 0 or not pay[0].has_key(87) ):
+            self.y_parsebuddies(self.roster_tmp)
+            self.roster_tmp = ''
         if pay[0].has_key(89):
             self.aliases = pay[0][89].split(',')
         for each in pay:
