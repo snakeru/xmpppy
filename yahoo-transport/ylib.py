@@ -519,6 +519,7 @@ class YahooCon:
             msg = msg[3:]
         else:
             typ = 1
+        msg = msg.replace('\n', '\r')
         pay = ymsg_mkargu({0:self.username, 1:self.username, 5:nick,14:msg})
         hdr = ymsg_mkhdr(self.version,len(pay), Y_msg,status,self.session)
         return hdr+pay
@@ -538,6 +539,7 @@ class YahooCon:
             msg = msg[3:]
         else:
             typ = 1
+        msg = msg.replace('\n', '\r')
         pay = ymsg_mkargu({0:self.username, 1:self.username, 5:nick,14:msg})
         hdr = ymsg_mkhdr(self.version,len(pay), Y_confpm,status,self.session)
         return hdr+pay

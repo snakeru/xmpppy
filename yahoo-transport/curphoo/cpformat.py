@@ -20,7 +20,10 @@
 # $Id$
 #
 # $Log$
-# Revision 1.2  2006-10-03 18:44:38  normanr
+# Revision 1.3  2009-04-07 09:23:26  snakeru
+# Fix in-message newlines handling (Thanks to Alexey Chernysh for this and away states)
+#
+# Revision 1.2  2006/10/03 18:44:38  normanr
 # don't strip accented letters unless requested
 #
 # Revision 1.1  2005/11/16 23:57:18  normanr
@@ -87,16 +90,16 @@ def squeeze_lines(s):
 
 def do(text, sess = None):
 	text = ESC_SEQ.sub('', text)
-	text = text.replace('\x0d\x0a', ' ')
-	text = text.replace('\x0d', '')
+	text = text.replace('\x0d\x0a', '\x0a')
+	text = text.replace('\x0d', '\x0a')
 	text = text.replace('\x0b', '')
 	text = COLOR_TAG.sub('', text)
 	text = FONT_TAG.sub('', text)
 	text = FADE_TAG.sub('', text)
 	text = ALT_TAG.sub('', text)
 	text = SND_TAG.sub('', text)
-	text = squeeze_lines(text)
-	text = MULTI_NL.sub('\n', text)
+#	text = squeeze_lines(text)
+#	text = MULTI_NL.sub('\n', text)
 	if (sess != None and sess.rc['auto-lowercase'].upper() == 'Y'):
 		text = no_all_caps(text)
 	if (sess != None and sess.rc['remove-nonprintable'].upper() == 'Y'):
