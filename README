@@ -2,7 +2,7 @@ This is an empty 'master' repository.
 If you did a 
 git clone git://......../xmpppy
 and got this instead - that means that you must do one more step:
-git checkout <branchname>
+git checkout remotes/origin/<branchname>
 where <branchname> is one of following:
     irc-transport
     mail-transport
